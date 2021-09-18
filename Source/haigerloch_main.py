@@ -58,7 +58,7 @@ def main():
     # KSRC_9_Z = [159.214466, 137.178932, 115.143398, 93.107864, 71.07233, 49.036797, 27.001263, 4.965729]
 
     """ Core 8
-    R_tank = 72.3333
+    r_tank = 72.3333
     N = 5
     P = [6, 12, 16, 20, 24]
     ring_radii_list = None
@@ -70,7 +70,7 @@ def main():
     """
 
     """ Core 9 
-    R_tank = 72.3333
+    r_tank = 72.3333
     N = 6
     P = [6, 12, 16, 20, 24, 30]
     ring_radii_list = None
@@ -82,7 +82,7 @@ def main():
     """
 
     """ Core 10
-    R_tank = 72.3333
+    r_tank = 72.3333
     N = 6
     P = [6, 12, 16, 20, 24, 30]
     ring_radii_list = None
@@ -94,7 +94,7 @@ def main():
     """
 
     """ Core 16
-    R_tank = 72.3333
+    r_tank = 72.3333
     N = 6
     P = [6, 12, 16, 20, 24, 30]
     ring_radii_list = None
@@ -106,7 +106,7 @@ def main():
     """
 
     """ Core 17 
-    R_tank = 72.3333
+    r_tank = 72.3333
     N = 6
     P = [6, 12, 16, 20, 24, 30]
     ring_radii_list = None
@@ -118,7 +118,7 @@ def main():
     """
 
     """ Core 18 
-    R_tank = 72.3333
+    r_tank = 72.3333
     N = 6
     P = [6, 12, 16, 20, 24, 30]
     ring_radii_list = None
@@ -130,7 +130,7 @@ def main():
     """
 
     """ Core 19
-    R_tank = 72.3333
+    r_tank = 72.3333
     N = 6
     P = [6, 12, 16, 20, 24, 30]
     ring_radii_list = None
@@ -142,7 +142,7 @@ def main():
     """
 
     """ Core 20 
-    R_tank = 72.3333
+    r_tank = 72.3333
     N = 6
     P = [6, 12, 16, 20, 24, 30]
     ring_radii_list = None
@@ -154,7 +154,7 @@ def main():
     """
 
     """ Core 21 
-    R_tank = 72.3333
+    r_tank = 72.3333
     N = 6
     P = [6, 12, 16, 20, 24, 30]
     ring_radii_list = None # [10.809523, 21.619046, 32.428569, 43.238091, 54.047614, 64.857137]
@@ -166,7 +166,7 @@ def main():
     """
 
     """ Core 22 
-    R_tank = 72.3333
+    r_tank = 72.3333
     N = 6
     P = [6, 12, 16, 20, 24, 30]
     ring_radii_list = None # [10.809523, 21.619046, 32.428569, 43.238091, 54.047614, 64.857137]
@@ -178,7 +178,7 @@ def main():
     """
 
     """ Core 23 
-    R_tank = 72.3333
+    r_tank = 72.3333
     N = 6
     P = [6, 12, 16, 20, 24, 30]
     ring_radii_list = None # [10.809523, 21.619046, 32.428569, 43.238091, 54.047614, 64.857137]
@@ -190,7 +190,7 @@ def main():
     """
 
     """ Core 24
-    R_tank = 72.3333
+    r_tank = 72.3333
     N = 6
     P = [6, 12, 16, 20, 24, 30]
     ring_radii_list = None # [10.809523, 21.619046, 32.428569, 43.238091, 54.047614, 64.857137]
@@ -202,7 +202,7 @@ def main():
     """
 
     """ Core 24 
-    R_tank = 72.3333
+    r_tank = 72.3333
     N = 6
     P = [6, 12, 16, 20, 24, 30]
     ring_radii_list = [10.809523, 21.619046, 32.428569, 43.238091, 54.047614, 64.857137]
@@ -214,17 +214,17 @@ def main():
     """
 
     """ Core 28 """
-    R_tank = 168.777777
-    N = 14
-    P = [6, 12, 16, 20, 24, 30, 36, 42, 50, 58, 64, 74, 84, 94]
+    r_tank = 168.777777
+    n_rings = 14
+    chains_per_ring = [6, 12, 16, 20, 24, 30, 36, 42, 50, 58, 64, 74, 84, 94]
     ring_radii_list = None
-    chain_interval = 7.75  # input('Input desired axial interval between cubes in cm: ')
-    inner_tank_height = 270
-    desired_num_cubes_on_chain_b = 10
-    desired_num_cubes_on_chain_a = 11
-    first_cube_offset = chain_interval
+    cube_interval = 7.75  # input('Input desired axial interval between cubes in cm: ')
+    h_tank = 270
+    n_cubes_chain_b = 10
+    n_cubes_chain_a = 11
+    first_cube_offset = cube_interval
 
-    if len(P) != int(N):
+    if len(chains_per_ring) != int(n_rings):
         print("You have not properly specified how many points you want to determine for each ring.")
         sys.exit()
 
@@ -239,14 +239,14 @@ def main():
 
     complement_str = ""
     counter = 1
-    for p in P:
+    for p in chains_per_ring:
         for pos in list(range(1, p+1)):
             if counter < 4:
-                new_complement_str = f"#{P.index(p)+2}0{str(pos).zfill(2)}"
+                new_complement_str = f"#{chains_per_ring.index(p)+2}0{str(pos).zfill(2)}"
                 complement_str = f"{complement_str} {new_complement_str}"
                 counter += 1
             elif counter >= 4:
-                new_complement_str = f"#{P.index(p)+2}0{str(pos).zfill(2)}"
+                new_complement_str = f"#{chains_per_ring.index(p)+2}0{str(pos).zfill(2)}"
                 complement_str = f"{complement_str}\n{new_complement_str}"
                 counter = 1
     print(complement_str)
@@ -255,11 +255,11 @@ def main():
     chain_b_code = ''
     chain_b_center_heights = []
 
-    while cube_number < desired_num_cubes_on_chain_b:
+    while cube_number < n_cubes_chain_b:
         cube_number += 1
-        cube_center_height = inner_tank_height - (first_cube_offset + cube_diagonal / 2
-                                                  + (chain_interval + cube_diagonal) / 2) \
-                             - (cube_number - 1) * (chain_interval + cube_diagonal)
+        cube_center_height = h_tank - (first_cube_offset + cube_diagonal / 2
+                                                  + (cube_interval + cube_diagonal) / 2) \
+                             - (cube_number - 1) * (cube_interval + cube_diagonal)
         # cube_center_height = inner_tank_height - chain_interval * (cube_number - 1) - cube_diagonal / 2 * cube_number \
         #                      - first_cube_offset - (chain_interval + cube_diagonal) / 2
         cube_top_height = cube_center_height + 5 * np.sqrt(2) / 2
@@ -279,10 +279,10 @@ def main():
     chain_a_code = ''
     chain_a_center_heights = []
 
-    while cube_number < desired_num_cubes_on_chain_a:
+    while cube_number < n_cubes_chain_a:
         cube_number += 1
-        cube_center_height = inner_tank_height - (first_cube_offset + cube_diagonal / 2) - (cube_number - 1) * \
-                             (chain_interval + cube_diagonal)
+        cube_center_height = h_tank - (first_cube_offset + cube_diagonal / 2) - (cube_number - 1) * \
+                             (cube_interval + cube_diagonal)
         # cube_center_height = inner_tank_height - chain_interval * (cube_number - 1) - cube_diagonal / 2 * cube_number \
         #                      - first_cube_offset
         cube_top_height = cube_center_height + 5 * np.sqrt(2) / 2
@@ -306,27 +306,27 @@ def main():
     print(cords_list_all)
     >>> [[[0.0, 2.0], [-0.0, -2.0]], [[0.0, 4.0], [-4.0, 0.0], [-0.0, -4.0], [4.0, -0.0]]]
     """
-    ring_number_list = np.arange(1, N + 1)
+    ring_number_list = np.arange(1, n_rings + 1)
     if ring_radii_list is None:
         ring_radii_list = []
         for ring_number in ring_number_list:
-            radius_increment = R_tank / (N + 1)
+            radius_increment = r_tank / (n_rings + 1)
             new_radius = radius_increment * ring_number
             ring_radii_list.append(round(new_radius, 6))
 
-    coords_list_all = []
+    cube_coords_all_list = []
 
     for r in ring_radii_list:
-        number_of_points = int(P[ring_radii_list.index(r)])
-        coords_list_for_this_ring = []
-        for pos in np.arange(0, number_of_points):
-            angle = 0 + 2 * np.pi / number_of_points * pos + np.pi / 2  # phase shift to begin at (0,y) and not (x, 0)
+        n_cubes_this_chain = int(chains_per_ring[ring_radii_list.index(r)])
+        cube_coords_this_ring_list = []
+        for pos in np.arange(0, n_cubes_this_chain):
+            angle = 0 + 2 * np.pi / n_cubes_this_chain * pos + np.pi / 2  # phase shift to begin at (0,y) and not (x, 0)
             x = str("{:.6f}".format(r * np.cos(angle)))
             y = str("{:.6f}".format(r * np.sin(angle)))
             if not x.startswith("-"): x = '+' + x
             if not y.startswith("-"): y = '+' + y
-            coords_list_for_this_ring.append([x, y])
-        coords_list_all.append(coords_list_for_this_ring)
+            cube_coords_this_ring_list.append([x, y])
+        cube_coords_all_list.append(cube_coords_this_ring_list)
 
     """ This section writes the cell code for the Core Fuel Positions
     Ex:
@@ -339,18 +339,18 @@ def main():
     cell_lines = f"c {ring_radii_list}\nc"
     for ring_number in ring_number_list:
         ring_index = int(ring_number - 1)
-        number_of_points = int(P[ring_index])
-        for pos in np.arange(0, number_of_points):
+        n_cubes_this_chain = int(chains_per_ring[ring_index])
+        for pos in np.arange(0, n_cubes_this_chain):
             if (ring_number + 1) % 2 != 0:  # for odd rings, the 1st position starts with Chain B
                 if (pos + 1) % 2 != 0:  #
-                    line = f"{int(ring_number) + 1}{str(pos + 1).zfill(3)} 0 +10 -11 -40 trcl=({coords_list_all[ring_index][pos][0]} {coords_list_all[ring_index][pos][1]} 0) imp:n=1 fill=80"
+                    line = f"{int(ring_number) + 1}{str(pos + 1).zfill(3)} 0 +10 -11 -40 trcl=({cube_coords_all_list[ring_index][pos][0]} {cube_coords_all_list[ring_index][pos][1]} 0) imp:n=1 fill=80"
                 else:
-                    line = f"{int(ring_number) + 1}{str(pos + 1).zfill(3)} 0 +10 -11 -40 trcl=({coords_list_all[ring_index][pos][0]} {coords_list_all[ring_index][pos][1]} 0) imp:n=1 fill=90"
+                    line = f"{int(ring_number) + 1}{str(pos + 1).zfill(3)} 0 +10 -11 -40 trcl=({cube_coords_all_list[ring_index][pos][0]} {cube_coords_all_list[ring_index][pos][1]} 0) imp:n=1 fill=90"
             else:
                 if (pos + 1) % 2 != 0:  #
-                    line = f"{int(ring_number) + 1}{str(pos + 1).zfill(3)} 0 +10 -11 -40 trcl=({coords_list_all[ring_index][pos][0]} {coords_list_all[ring_index][pos][1]} 0) imp:n=1 fill=90"
+                    line = f"{int(ring_number) + 1}{str(pos + 1).zfill(3)} 0 +10 -11 -40 trcl=({cube_coords_all_list[ring_index][pos][0]} {cube_coords_all_list[ring_index][pos][1]} 0) imp:n=1 fill=90"
                 else:
-                    line = f"{int(ring_number) + 1}{str(pos + 1).zfill(3)} 0 +10 -11 -40 trcl=({coords_list_all[ring_index][pos][0]} {coords_list_all[ring_index][pos][1]} 0) imp:n=1 fill=80"
+                    line = f"{int(ring_number) + 1}{str(pos + 1).zfill(3)} 0 +10 -11 -40 trcl=({cube_coords_all_list[ring_index][pos][0]} {cube_coords_all_list[ring_index][pos][1]} 0) imp:n=1 fill=80"
             cell_lines = '\n'.join([cell_lines, line])
 
     """ This section writes the surface code for the Core Fuel Positions
@@ -385,21 +385,21 @@ def main():
     indent_space = "      "
     for ring_number in ring_number_list:
         ring_index = int(ring_number - 1)
-        number_of_points = int(P[ring_index])
-        for pos in np.arange(0, number_of_points):
+        n_cubes_this_chain = int(chains_per_ring[ring_index])
+        for pos in np.arange(0, n_cubes_this_chain):
             if ring_number % 2 == 0:
                 if (pos + 1) % 2 == 0:
                     for z in chain_a_center_heights:
                         z = str("{:.6f}".format(z))
                         if not z.startswith("-"): z = '+' + z
-                        line = f"{indent_space} {coords_list_all[ring_index][pos][0]} {coords_list_all[ring_index][pos][1]} {z}"
+                        line = f"{indent_space} {cube_coords_all_list[ring_index][pos][0]} {cube_coords_all_list[ring_index][pos][1]} {z}"
                         ksrc_lines = '\n'.join([ksrc_lines, line])
                         test_counter += 1
                 else:
                     for z in chain_b_center_heights:
                         z = str("{:.6f}".format(z))
                         if not z.startswith("-"): z = '+' + z
-                        line = f"{indent_space} {coords_list_all[ring_index][pos][0]} {coords_list_all[ring_index][pos][1]} {z}"
+                        line = f"{indent_space} {cube_coords_all_list[ring_index][pos][0]} {cube_coords_all_list[ring_index][pos][1]} {z}"
                         ksrc_lines = '\n'.join([ksrc_lines, line])
                         test_counter += 1
             else:
@@ -407,14 +407,14 @@ def main():
                     for z in chain_b_center_heights:
                         z = str("{:.6f}".format(z))
                         if not z.startswith("-"): z = '+' + z
-                        line = f"{indent_space} {coords_list_all[ring_index][pos][0]} {coords_list_all[ring_index][pos][1]} {z}"
+                        line = f"{indent_space} {cube_coords_all_list[ring_index][pos][0]} {cube_coords_all_list[ring_index][pos][1]} {z}"
                         ksrc_lines = '\n'.join([ksrc_lines, line])
                         test_counter += 1
                 else:
                     for z in chain_a_center_heights:
                         z = str("{:.6f}".format(z))
                         if not z.startswith("-"): z = '+' + z
-                        line = f"{indent_space} {coords_list_all[ring_index][pos][0]} {coords_list_all[ring_index][pos][1]} {z}"
+                        line = f"{indent_space} {cube_coords_all_list[ring_index][pos][0]} {cube_coords_all_list[ring_index][pos][1]} {z}"
                         ksrc_lines = '\n'.join([ksrc_lines, line])
                         test_counter += 1
 

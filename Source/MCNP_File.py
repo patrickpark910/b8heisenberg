@@ -25,13 +25,17 @@ class MCNP_File:
     def __init__(self, run_type,
                  tasks,
                  print_input=True,  # default: only defines self variables and does not print input template
-                 index_data=None,
-                 template_filepath=None,  # default: uses ./Source/reed.template
                  core_number=49,  # default: reads fuel load positions from ./Source/Core/49.core
-                 MCNP_folder=None,
-                 results_folder=None,
-                 source_folder=f"./Source",
                  delete_extensions=['.s'],  # default: '.s'
+                 r_tank=62, # cm
+                 h_tank=119.8, # cm
+                 n_rings=5,
+                 chains_per_ring=[6,12,16,20,24],
+                 ring_radii_list=None,
+                 n_cubes_chain_a=9,
+                 n_cubes_chain_b=8,
+                 cube_interval=5.5,
+                 first_cube_offset=5.5,
                  h2o_temp_K=294,  # used in: rcty, 293 K = 20 C = room temp = default temp in mcnp
                  h2o_density=None,  # used in: rcty, set None to calculate h2o_density from h2o_temp_K (recommended)
                  h2o_void_percent=0,  #
@@ -47,16 +51,23 @@ class MCNP_File:
         """
         Define core parameters
         """
-        self.index_data = index_data
         self.print_input = print_input
         self.datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self.template_filepath = template_filepath
         self.run_type = run_type
         self.tasks = tasks
         self.core_number = core_number
         self.delete_extensions = delete_extensions
         self.username = getpass.getuser()
-        self.source_folder = source_folder
+
+        # core geometric properties
+        self.r_tank, self.h_tank, self.n_rings = r_tank, h_tank, n_rings
+        self.chains_per_ring = chains_per_ring
+        self.ring_radii_list = ring_radii_list
+        self.cube_interval = cube_interval
+        self.n_cubes_chain_a, self.n_cubes_chain_b = n_cubes_chain_a, n_cubes_chain_b
+        self.first_cube_offset = first_cube_offset
+
+
 
         # heavy water moderator properties - all mat and mt libs defined in functions below
         self.h2o_temp_K = h2o_temp_K
@@ -91,21 +102,9 @@ class MCNP_File:
         """
         Define and create necessary directories
         """
-        if not template_filepath:
-            self.template_filepath = f"./Source/reed.template"
-        else:
-            self.template_filepath = template_filepath
-
-        if not MCNP_folder:
-            self.MCNP_folder = f'./MCNP/{run_type}'
-        else:
-            self.MCNP_folder = MCNP_folder
-
-        if not results_folder:
-            self.results_folder = f'./Results/{run_type}'
-        else:
-            self.results_folder = results_folder
-
+        self.template_filepath = f"./Source/reed.template"
+        self.MCNP_folder = f'./MCNP/{run_type}'
+        self.results_folder = f'./Results/{run_type}'
         self.temp_folder = f'{self.MCNP_folder}/temp'
         self.user_temp_folder = f'{self.temp_folder}/{self.username}'
         self.inputs_folder = f"{self.MCNP_folder}/inputs"
@@ -158,25 +157,7 @@ class MCNP_File:
                                   f"_a{str(self.parameters['safe_height']).zfill(3)}" \
                                   f"_h{str(self.parameters['shim_height']).zfill(3)}" \
                                   f"_r{str(self.parameters['reg_height']).zfill(3)}.i"
-        elif self.run_type == 'crit':
-            pass
-        elif self.run_type == 'prnt':
-            self.input_filename = f"{self.base_filename}" \
-                                  f"_a{str(self.parameters['safe_height']).zfill(3)}" \
-                                  f"_h{str(self.parameters['shim_height']).zfill(3)}" \
-                                  f"_r{str(self.parameters['reg_height']).zfill(3)}.i"
-        elif self.run_type.startswith('rcty'):
-            if 'modr' in self.run_type:
-                var = str(round(self.h2o_temp_K - 273)).zfill(2) + "C"  # ex: 01C, 10C, 20C, etc.
-            elif 'fuel' in self.run_type:
-                var = str(round(self.fuel_temp_K)).zfill(4) + "K"  # ex: 0001K, 0100K, 2720K, etc.
-            elif 'void' in self.run_type:
-                var = str(round(self.h2o_void_percent)).zfill(2) + "at"  # ex: 00at,10at,99at, etc.
-            self.input_filename = f"{self.base_filename}_{self.run_type}" \
-                                  f"_{var}" \
-                                  f"_a{str(self.parameters['safe_height']).zfill(3)}" \
-                                  f"_h{str(self.parameters['shim_height']).zfill(3)}" \
-                                  f"_r{str(self.parameters['reg_height']).zfill(3)}.i"
+
 
         else:
             self.input_filename = f"{self.base_filename}_{self.run_type}" \
@@ -202,16 +183,133 @@ class MCNP_File:
                 self.print_input = False
                 print(f"\n input file created at: {self.input_filepath}")
 
-    def read_core_config(self):
-        """
-        Reads core configs
-        """
-        self.core_config_dict = {}
-        with open(f"{self.source_folder}/Core/{self.core_number}.core", 'r') as core_config_file:
-            for line in core_config_file:
-                if not line.startswith('c'):
-                    pos, element = str(line.split('$')[0].split('=')[0]), int(line.split('$')[0].split('=')[-1])
-                    self.core_config_dict[pos] = element
+    def write_setup(self):
+        self.ring_number_list = np.arange(1, self.n_rings + 1)
+        if self.ring_radii_list is None:
+            ring_radii_list = []
+            for ring_number in self.ring_number_list:
+                radius_increment = self.r_tank / (self.n_rings + 1)
+                new_radius = radius_increment * ring_number
+                ring_radii_list.append(round(new_radius, 6))
+
+        self.cube_coords_all_list = []
+
+        for r in self.ring_radii_list:
+            n_cubes_this_chain = int(self.chains_per_ring[self.ring_radii_list.index(r)])
+            cube_coords_this_ring_list = []
+            for pos in np.arange(0, n_cubes_this_chain):
+                angle = 0 + 2 * np.pi / n_cubes_this_chain * pos + np.pi / 2  # phase shift to begin at (0,y) and not (x, 0)
+                x = str("{:.6f}".format(r * np.cos(angle)))
+                y = str("{:.6f}".format(r * np.sin(angle)))
+                if not x.startswith("-"): x = '+' + x
+                if not y.startswith("-"): y = '+' + y
+                cube_coords_this_ring_list.append([x, y])
+            self.cube_coords_all_list.append(cube_coords_this_ring_list)
+
+    def write_cells_complements_str(self):
+        complement_str = ""
+        counter = 1
+        for p in self.chains_per_ring:
+            for pos in list(range(1, p + 1)):
+                if counter < 4:
+                    new_complement_str = f"#{self.chains_per_ring.index(p) + 2}0{str(pos).zfill(2)}"
+                    complement_str = f"{complement_str} {new_complement_str}"
+                    counter += 1
+                elif counter >= 4:
+                    new_complement_str = f"#{self.chains_per_ring.index(p) + 2}0{str(pos).zfill(2)}"
+                    complement_str = f"{complement_str}\n{new_complement_str}"
+                    counter = 1
+        return complement_str
+
+    def write_cube_surfaces(self):
+        cube_number = 0
+        chain_b_code = ''
+        chain_b_center_heights = []
+        while cube_number < self.n_cubes_chain_b:
+            cube_number += 1
+            cube_center_height = self.h_tank - (self.first_cube_offset + CUBE_DIAGONAL / 2
+                                           + (self.cube_interval + CUBE_DIAGONAL) / 2) \
+                                 - (cube_number - 1) * (self.cube_interval + CUBE_DIAGONAL)
+            # cube_center_height = inner_tank_height - chain_interval * (cube_number - 1) - cube_diagonal / 2 * cube_number \
+            #                      - first_cube_offset - (chain_interval + cube_diagonal) / 2
+            cube_top_height = cube_center_height + 5 * np.sqrt(2) / 2
+            cube_bot_height = cube_center_height - 5 * np.sqrt(2) / 2
+            new_code = f"c center at z = {round(cube_center_height, 6)}\n" \
+                       f"8{cube_number}1 p  0   1  1  {round(cube_top_height, 6)}\n" \
+                       f"8{cube_number}2 p  0  -1  1  {round(cube_top_height, 6)}\n" \
+                       f"8{cube_number}3 p  0   1  1  {round(cube_bot_height, 6)}\n" \
+                       f"8{cube_number}4 p  0  -1  1  {round(cube_bot_height, 6)}\n"
+            chain_b_center_heights.append(round(cube_center_height, 6))
+            chain_b_code = f"{chain_b_code}c\nc ------ Cube {cube_number} ------ \n{new_code}"
+        chain_b_code = chain_b_code + 'c\nc 8-cube chain center z coordinates\nc ' + str(
+            chain_b_center_heights)
+
+        cube_number = 0
+        chain_a_code = ''
+        chain_a_center_heights = []
+        while cube_number < self.n_cubes_chain_a:
+            cube_number += 1
+            cube_center_height = self.h_tank - (self.first_cube_offset + CUBE_DIAGONAL / 2) - (cube_number - 1) * \
+                                 (self.cube_interval + CUBE_DIAGONAL)
+            # cube_center_height = inner_tank_height - chain_interval * (cube_number - 1) - cube_diagonal / 2 * cube_number \
+            #                      - first_cube_offset
+            cube_top_height = cube_center_height + 5 * np.sqrt(2) / 2
+            cube_bot_height = cube_center_height - 5 * np.sqrt(2) / 2
+            new_code = f"c center at z = {round(cube_center_height, 6)}\n" \
+                       f"9{cube_number}1 p  0   1  1  {round(cube_top_height, 6)}\n" \
+                       f"9{cube_number}2 p  0  -1  1  {round(cube_top_height, 6)}\n" \
+                       f"9{cube_number}3 p  0   1  1  {round(cube_bot_height, 6)}\n" \
+                       f"9{cube_number}4 p  0  -1  1  {round(cube_bot_height, 6)}\n"
+            chain_a_center_heights.append(round(cube_center_height, 6))
+            chain_a_code = f"{chain_a_code}c\nc ------ Cube {cube_number} ------ \n{new_code}"
+        chain_a_code = chain_a_code + 'c\nc 9-cube chain center z coordinates\nc ' + str(
+            chain_a_center_heights)
+
+        return chain_a_code, chain_b_code
+
+    def write_core_fuel_cells(self):
+
+
+    def write_ksrc_card(self):
+        ksrc_lines = "c"
+        test_counter = 0
+        indent_space = "      "
+        ring_number_list = np.arange(1, self.n_rings + 1)
+        for ring_number in ring_number_list:
+            ring_index = int(ring_number - 1)
+            number_of_points = int(self.chains_per_ring[ring_index])
+            for pos in np.arange(0, number_of_points):
+                if ring_number % 2 == 0:
+                    if (pos + 1) % 2 == 0:
+                        for z in self.chain_a_center_heights:
+                            z = str("{:.6f}".format(z))
+                            if not z.startswith("-"): z = '+' + z
+                            line = f"{indent_space} {self.coords_list_all[ring_index][pos][0]} {self.coords_list_all[ring_index][pos][1]} {z}"
+                            ksrc_lines = '\n'.join([ksrc_lines, line])
+                            test_counter += 1
+                    else:
+                        for z in self.chain_b_center_heights:
+                            z = str("{:.6f}".format(z))
+                            if not z.startswith("-"): z = '+' + z
+                            line = f"{indent_space} {self.coords_list_all[ring_index][pos][0]} {self.coords_list_all[ring_index][pos][1]} {z}"
+                            ksrc_lines = '\n'.join([ksrc_lines, line])
+                            test_counter += 1
+                else:
+                    if (pos + 1) % 2 == 0:
+                        for z in self.chain_b_center_heights:
+                            z = str("{:.6f}".format(z))
+                            if not z.startswith("-"): z = '+' + z
+                            line = f"{indent_space} {self.coords_list_all[ring_index][pos][0]} {self.coords_list_all[ring_index][pos][1]} {z}"
+                            ksrc_lines = '\n'.join([ksrc_lines, line])
+                            test_counter += 1
+                    else:
+                        for z in self.chain_a_center_heights:
+                            z = str("{:.6f}".format(z))
+                            if not z.startswith("-"): z = '+' + z
+                            line = f"{indent_space} {self.coords_list_all[ring_index][pos][0]} {self.coords_list_all[ring_index][pos][1]} {z}"
+                            ksrc_lines = '\n'.join([ksrc_lines, line])
+                            test_counter += 1
+        return ksrc_lines
 
     def create_paths(self, paths_to_create=None):
         """
@@ -362,65 +460,7 @@ class MCNP_File:
             print(f'\n   comment. skipping this mcnp run since results for {self.input_filename} already exist.')
             self.mcnp_skipped = True
 
-    def read_fuel_data(self):
-        fuel_wb_name = self.fuel_filepath
-        burnup_sht_name = "Core History"
 
-        # pd.read_excel({file_name}, sheet_name= , usecols= )
-        burnup_df = pd.read_excel(fuel_wb_name, sheet_name=burnup_sht_name, usecols='I,V:X', engine='openpyxl')
-
-        # Currently, 'burnup_sht' uses the first row as column names. Rename it to the column column letters used in XLSX.
-        burnup_df.columns = ['I', 'V', 'W', 'X']
-
-        # Get rid of all the empty rows or rows with text in them.
-        burnup_df = burnup_df[pd.to_numeric(burnup_df.iloc[:, 0], errors='coerce').notnull()]
-
-        # Get rid of FE 101, as that is not a regular FE used in our MCNP code.
-        burnup_df.drop(burnup_df.loc[burnup_df['I'] == 101].index, inplace=True)
-        burnup_df.reset_index(drop=True, inplace=True)
-
-        """ 
-        df.apply(func, axis= {0 or ‘index’, 1 or ‘columns’, default 0}, result_type={‘expand’, default None}
-        Notice that the get_mass_frac function actually outputs a list of 1 int and 5 floats.
-        With result_type = None, the list is one entry in the new mass_fracs_df.
-        With result_type = 'expand', each element of the list is separated into different columns
-        """
-        mass_fracs_df = burnup_df.apply(get_mass_fracs, axis=1, result_type='expand')  # Utilities.py
-
-        # Rename columns to their respective variable names
-        mass_fracs_df.columns = ['fe_id', 'g_U235', 'g_U238', 'g_Pu239', 'g_Sm149', 'g_Zr', 'g_H',
-                                 'a_U235', 'a_U238', 'a_Pu239', 'a_Sm149', 'a_Zr',
-                                 'a_H']  # keep order as get_mass_fracs() output in Utilities.py
-
-        fuel_mat_cards = f"c materials auto-generated from '{fuel_wb_name}'"
-
-        if self.add_samarium:
-            for i in range(0, len(mass_fracs_df)):
-                fe_id = int(str(mass_fracs_df.loc[i, 'fe_id'])[:4])  # truncates '10705' to '1070'
-                fuel_mat_cards += f"\nc" \
-                                  f"\nm{fe_id}    {self.u235_xs_lib} {'{:.6e}'.format(mass_fracs_df.loc[i, 'a_U235'])} $ u-235 {round(mass_fracs_df.loc[i, 'g_U235'], 6):.6f} g" \
-                                  f"\n         {self.u238_xs_lib} {'{:.6e}'.format(mass_fracs_df.loc[i, 'a_U238'])} $ u-238 {round(mass_fracs_df.loc[i, 'g_U238'], 6):.6f} g" \
-                                  f"\n         {self.pu239_xs_lib} {'{:.6e}'.format(mass_fracs_df.loc[i, 'a_Pu239'])} $ pu-239 {round(mass_fracs_df.loc[i, 'g_Pu239'], 6):.6f} g" \
-                                  f"\n         {self.sm149_xs_lib} {'{:.6e}'.format(mass_fracs_df.loc[i, 'a_Sm149'])} $ sm-149 {round(mass_fracs_df.loc[i, 'g_Sm149'], 6):.6f} g" \
-                                  f"\n         {self.zr_xs_lib} {'{:.6e}'.format(mass_fracs_df.loc[i, 'a_Zr'])} $ zr {round(mass_fracs_df.loc[i, 'g_Zr'], 6):.6f} g" \
-                                  f"\n          {self.h_xs_lib} {'{:.6e}'.format(mass_fracs_df.loc[i, 'a_H'])} $ h {round(mass_fracs_df.loc[i, 'g_H'], 6):.6f} g" \
-                                  f"\nmt{fe_id} {self.h_zr_sab_lib} {self.zr_h_sab_lib}" \
-                                  f"\nc " \
-                                  f"\nc "
-        else:
-            for i in range(0, len(mass_fracs_df)):
-                fe_id = int(str(mass_fracs_df.loc[i, 'fe_id'])[:4])  # truncates '10705' to '1070'
-                fuel_mat_cards += f"\nc" \
-                                  f"\nm{fe_id}    {self.u235_xs_lib} {'{:.6e}'.format(mass_fracs_df.loc[i, 'a_U235'])} $ u-235 {round(mass_fracs_df.loc[i, 'g_U235'], 6):.6f} g" \
-                                  f"\n         {self.u238_xs_lib} {'{:.6e}'.format(mass_fracs_df.loc[i, 'a_U238'])} $ u-238 {round(mass_fracs_df.loc[i, 'g_U238'], 6):.6f} g" \
-                                  f"\n         {self.pu239_xs_lib} {'{:.6e}'.format(mass_fracs_df.loc[i, 'a_Pu239'])} $ pu-239 {round(mass_fracs_df.loc[i, 'g_Pu239'], 6):.6f} g" \
-                                  f"\n         {self.zr_xs_lib} {'{:.6e}'.format(mass_fracs_df.loc[i, 'a_Zr'])} $ zr {round(mass_fracs_df.loc[i, 'g_Zr'], 6):.6f} g" \
-                                  f"\n          {self.h_xs_lib} {'{:.6e}'.format(mass_fracs_df.loc[i, 'a_H'])} $ h {round(mass_fracs_df.loc[i, 'g_H'], 6):.6f} g" \
-                                  f"\nmt{fe_id} {self.h_zr_sab_lib} {self.zr_h_sab_lib}" \
-                                  f"\nc " \
-                                  f"\nc "
-
-        self.fuel_mat_cards = fuel_mat_cards
 
     def extract_keff(self):
         """
