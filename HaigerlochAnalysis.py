@@ -4,6 +4,9 @@ import shutil
 import argparse
 
 sys.path.insert(0, "./Source/")
+from BaseCase import *
+from Parameters import *
+from Utilities import *
 
 """
 This file uses PEP8 Python Style Guidelines.
@@ -56,8 +59,8 @@ def ReedAutomatedNeutronicsEngine(argv):
 
     run_types = list(args_dict['r'].split(','))
     for run_type in run_types:
-        if run_type.lower() in ['def','default']:
-            run_types = ['default' if x == run_type else x for x in run_types]
+        if run_type.lower() in ['b','base']:
+            run_types = ['base' if x == run_type else x for x in run_types]
         elif run_type.lower() in ['dens_fuel','urho','uraniumdensity']:
             run_types = ['dens_fuel' if x == run_type else x for x in run_types]
         else:
@@ -111,19 +114,17 @@ def ReedAutomatedNeutronicsEngine(argv):
     for run_type in run_types:
         print(f"\n Currently calculating: {RUN_DESCRIPTIONS_DICT[run_type]}")
 
-        if run_type == 'default':
-            """ DEFAULT
+        if run_type == 'base':
+            """ BASE CASE
             """
-            current_run = Default(run_type,
+            current_run = BaseCase(run_type,
                                   tasks,
                                   core_number=core_number,
-                                  rod_heights={'bank': bank_height},
-                                  rod_config_id='bank',
                                   )
             if check_mcnp:
                 current_run.run_mcnp()
                 current_run.move_mcnp_files(output_types_to_move=['.o'])  # keep as separate step from run_mcnp()
-            current_run.process_rod_worth()
+            # current_run.process_rod_worth()
 
 
         elif run_type == 'crit':

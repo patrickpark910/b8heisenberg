@@ -48,7 +48,7 @@ c Model exterior light water
 c
 c Inner fuel tank
 1100 10201 {{ d2o_density }} -42 +10 -11
-                {{ core_fuel_cells_complements }} imp:n=1
+{{ core_fuel_cells_complements }} imp:n=1 $ tmp={{ d2o_temp_MeV }}
 c
 c                inner          outer cylinder
 1101 10400 -1.81 (+42:-10:+11) -43 +12 -13 imp:n=1 $ inner shell AZ91 Mg
@@ -61,7 +61,7 @@ c
 c
 c
 c ----------------------------------------------------------------
-c -------------------- 8-Chain Universe Cells --------------------
+c -------------------- Chain A Universe Cells --------------------
 c ----------------------------------------------------------------
 c
 c         +Y
@@ -80,14 +80,28 @@ c
 c 100001 0 +42:-10:+11 imp:n=0 u=80
 c
 c water inside universe and outside cubes & chain
-800000 10201 {{ d2o_density }}  -11 +10 -4 $ imp:n=1 u=80
-                {{ chain_a_cube_cells_complements }} imp:n=1 u=80
+800000 10201 {{ d2o_density }}  -11 +10 -4
+                #100008
+                #800001 #800002 #800003 #800004
+                #800005 #800006 #800007 #800008 $ {{ chain_a_cube_cells_complements }}
+                imp:n=1 u=80
 c
 c aluminum chain
 100008 10301 -2.68 -11 -41 +10
-              {{ chain_a_cube_cells_complements }} imp:n=1 u=80
+                #800001 #800002 #800003 #800004
+                #800005 #800006 #800007 #800008 # {{ chain_a_cube_cells_complements }}
+               imp:n=1 u=80
 c
-{{ chain_a_cube_cells }}
+800001 10001 {{ fuel_density }} -811 -812 +813 +814 -805 +806  imp:n=1 u=80 $ 8-chain cube 1
+800002 10001 {{ fuel_density }} -821 -822 +823 +824 -805 +806  imp:n=1 u=80 $ 8-chain cube 2
+800003 10001 {{ fuel_density }} -831 -832 +833 +834 -805 +806  imp:n=1 u=80 $ 8-chain cube 3
+800004 10001 {{ fuel_density }} -841 -842 +843 +844 -805 +806  imp:n=1 u=80 $ 8-chain cube 4
+800005 10001 {{ fuel_density }} -851 -852 +853 +854 -805 +806  imp:n=1 u=80 $ 8-chain cube 5
+800006 10001 {{ fuel_density }} -861 -862 +863 +864 -805 +806  imp:n=1 u=80 $ 8-chain cube 6
+800007 10001 {{ fuel_density }} -871 -872 +873 +874 -805 +806  imp:n=1 u=80 $ 8-chain cube 7
+800008 10001 {{ fuel_density }} -881 -882 +883 +884 -805 +806  imp:n=1 u=80 $ 8-chain cube 8
+c
+c {{ chain_a_cube_cells }}
 c
 c
 c
@@ -117,15 +131,26 @@ c
 c water inside universe and outside cubes & chain
 900000 10201 {{ d2o_density }}   -11  +10  -4
                #100009
-               {{ chain_b_cube_cells_complements }}
+               #900001 #900002 #900003 #900004
+               #900005 #900006 #900007 #900008 #900009 $ {{ chain_b_cube_cells_complements }}
                imp:n=1 u=90
 c
 c aluminum chain
 100009 10301 -2.68 -41  +10  -11
-              {{ chain_b_cube_cells_complements }}
+               #900001 #900002 #900003 #900004
+               #900005 #900006 #900007 #900008 #900009 $ {{ chain_b_cube_cells_complements }}
               imp:n=1 u=90
 c
-{{ chain_b_cube_cells }}
+900001 10001 {{ fuel_density }} -911 -912 +913 +914 -905 +906  imp:n=1 u=90 $ cube 1
+900002 10001 {{ fuel_density }} -921 -922 +923 +924 -905 +906  imp:n=1 u=90 $ cube 2
+900003 10001 {{ fuel_density }} -931 -932 +933 +934 -905 +906  imp:n=1 u=90 $ cube 3
+900004 10001 {{ fuel_density }} -941 -942 +943 +944 -905 +906  imp:n=1 u=90 $ cube 4
+900005 10001 {{ fuel_density }} -951 -952 +953 +954 -905 +906  imp:n=1 u=90 $ cube 5
+900006 10001 {{ fuel_density }} -961 -962 +963 +964 -905 +906  imp:n=1 u=90 $ cube 6
+900007 10001 {{ fuel_density }} -971 -972 +973 +974 -905 +906  imp:n=1 u=90 $ cube 7
+900008 10001 {{ fuel_density }} -981 -982 +983 +984 -905 +906  imp:n=1 u=90 $ cube 8
+900009 10001 {{ fuel_density }} -991 -992 +993 +994 -905 +906  imp:n=1 u=90 $ cube 9
+c {{ chain_b_cube_cells }}
 c
 c
 c
@@ -156,7 +181,7 @@ c
 41  cz  0.2  $ OD Al string
 42  cz  62   $ OD inner tank
 43  cz  62.3   $ OD inner tank thickness
-44  cz  105  $ OD outer tank
+44  cz  105    $ OD outer tank
 45  cz  105.5  $ OD outer tank thickness
 c
 c 50  cy
@@ -466,7 +491,6 @@ c
 c
 c
 c
-ksrc
 {{ ksrc_card }}
 c
 c
@@ -480,7 +504,7 @@ c keep the 1st entry >> 2500
 c
 nps 1e+6
 mode n
-kcode 20000 1 50 150
+kcode {{ n_per_cycle }} 1 {{ discard_cycles }} {{ kcode_cycles }}
 kopts blocksize=10 kinetics=yes precursor=yes
 c
 fmesh4:n  GEOM= xyz    ORIGIN= -106 -106 -30
