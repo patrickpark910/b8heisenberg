@@ -220,7 +220,7 @@ def interpolate_mat(frac, temp, xs_dict):
 
     return mat_interpolated_str
 
-def find_h2o_temp_K_density(K):
+def h2o_temp_K_to_mass_density(K):
     try:
         C = float('{:.2f}'.format(float(K)-273))
         density = float('{:.6f}'.format((
@@ -242,3 +242,30 @@ def find_h2o_temp_K_density(K):
     except:
         print(f"\n   fatal. finding h2o density for temperature {K} K failed")
         print(f"   fatal. ensure you are inputing a numeric-only str, float, or int into the function")
+
+
+def d2o_temp_K_to_mass_density(K):
+    """ Patrick
+    This function takes desired d2o temperature in Celsius
+    and outputs the d2o mass density at that tempreature
+
+    Obtained from "saturated liquid density equation" in
+    https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=926336
+    """
+    d2o_temp_K = float(K)
+    d2o_critical_temp = 643.847 # K
+    d2o_molar_mass = 20.0276 # g/mol
+    dm3_to_cm3 = 1000
+    d2o_critical_density_mol_per_dm3 = 17.77555 # mol/dm^3
+    theta = 1 - d2o_temp_K / d2o_critical_temp
+    d2o_density_mol_per_dm3 = d2o_critical_density_mol_per_dm3 * (1 
+                              + 1.662 * theta ** 0.29 \
+                              + 9.01130 * theta ** 1.00 \
+                              + (-15.421) * theta ** 1.30 \
+                              + 11.5760 * theta ** 1.77 \
+                              + (-5.1694) * theta ** 2.50 \
+                              + (-236.24) * theta ** 16)
+    d2o_mass_density = d2o_density_mol_per_dm3 * d2o_molar_mass / dm3_to_cm3
+    d2o_mass_density = float("{:.6e}".format(d2o_mass_density))
+    return d2o_mass_density
+

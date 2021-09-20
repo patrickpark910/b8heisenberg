@@ -44,7 +44,7 @@ c --Begin Cells--
 c ---------------
 c
 c Model exterior light water
-1000 0 +45:-15:+17 imp:n=0 $ light water
+1000 10200  {{ h2o_density }} +45:-15:+17 imp:n=0 $ light water
 c
 c Inner fuel tank
 1100 10201 {{ d2o_density }} -42 +10 -11
@@ -176,7 +176,7 @@ c
 c 30  px
 c
 c
-4 cz 4.401
+4   cz 4.401
 40  cz  4.4  $ cyclinder of fuel universe fill - must be at least 5*sqrt(3)/2 = 4..33
 41  cz  0.2  $ OD Al string
 42  cz  62   $ OD inner tank
@@ -376,7 +376,7 @@ c
 c
 c ------ Air ------
 c
-c Unused-- exterior of outer tank is void
+c Unused-- exterior of outer tank is light water
 c
 c Weight fracs from NIST standards
 c
@@ -391,7 +391,8 @@ c Unused-- inner tank is D2O
 c
 c Assumed to be 66..67 at% Oxygen, 33..33 at% Hydrogen
 c
-m10200   1001.00c 0.6667   8016.00c 0.3333
+m10200   {{ h_mats }} 
+         {{ o_mat_lib }} 1.0000
 c
 mt10200  {{ h2o_sab_lib }}     {{ o_sab_lib }} $ thermal scattering at {{ h2o_temp_K }}
 c
@@ -428,7 +429,7 @@ m10301  13027.00c -0.9525 $ Al
         29063.00c -0.0004 $ Cu
         25055.00c -0.0001 $ Mn
 c
-mt10301  al27.22t
+mt10301  al-27.40t    fe-56.40t  $ 294 K
 c
 c
 c ------- 1100F Aluminum -------
@@ -442,6 +443,8 @@ m10302  13027.00c 0.996   26054.00c 0.0056
         14029.00c 0.004   14030.00c 0.003
         29063.00c 0.0086  29065.00c 0.0039
         25055.00c 0.0005
+c
+mt10301  al-27.40t    fe-56.40t  $ 294 K
 c
 c
 c ------ Magnesium alloy (AZ91) -----
@@ -477,12 +480,11 @@ c
 c  Graphite used as the material for the reflector blank as well as the fuel element upper and lower spacers
 c  Assumed to be pure elemental carbon
 c
-c Density 1..8 g/cc
+c Density 1..8 g/cc due to air gaps (Pesic 18)
 c
+m10601    6012.00c  0.9893    6013.00c  0.0107
 c
-m10601    6000.00c 1.0
-c
-mt10601   grph.10t
+mt10601   grph.40t
 c
 c
 c

@@ -37,16 +37,16 @@ class MCNP_File:
                  n_cubes_chain_b=8,
                  cube_interval=5.5,
                  first_cube_offset=5.5,
-                 h2o_temp_K=294,  # used in: rcty, 293 K = 20 C = room temp = default temp in mcnp
+                 h2o_temp_K = 294,  # used in: rcty, 294 K = 21 C = room temp = default temp in mcnp
                  h2o_density=None,  # used in: rcty, set None to calculate h2o_density from h2o_temp_K (recommended)
                  h2o_void_percent=0,  #
-                 d2o_temp_K=294,  # used in: rcty, 293 K = 20 C = room temp = default temp in mcnp
+                 d2o_temp_K=294,  # used in: rcty, 294 K = 21 C = room temp = default temp in mcnp
                  d2o_density=None,  # used in: rcty, set None to calculate h2o_density from h2o_temp_K (recommended)
                  d2o_void_percent=0,  #
                  d2o_purity=96.8,  # at% d2o
                  fuel_temp_K=294,  # used in: rcty
                  fuel_density=19.05, # 19.05 g/cc nominal density
-                 grph_density=1.8, # 1.80 g/cc nominal density w air gaps
+                 grph_density=1.8, # 1.80 g/cc nominal density w air gapsg
                  ):
 
         """
@@ -60,7 +60,7 @@ class MCNP_File:
         self.delete_extensions = delete_extensions
         self.username = getpass.getuser()
 
-        ''' Core geometric properties'''
+        ''' Core geometric properties '''
         self.r_tank, self.h_tank, self.n_rings = r_tank, h_tank, n_rings # tank radius (cm), height (cm), number of fuel rings
         self.chains_per_ring = chains_per_ring
         self.ring_radii_list = ring_radii_list
@@ -70,13 +70,16 @@ class MCNP_File:
 
         ''' Heavy and light water moderator properties '''
         self.h2o_temp_K = h2o_temp_K
-        self.h2o_void_percent = h2o_void_percent
-
+        # self.h2o_void_percent = h2o_void_percent
         if not h2o_density:
-            self.h2o_density = (1 - 0.01 * self.h2o_void_percent) * find_h2o_temp_K_density(
-                h2o_temp_K)  # if h2o_density == None, calculate density from temp
+            self.h2o_density = (1 - 0.01 * self.h2o_void_percent) * h2o_temp_K_to_mass_density(h2o_temp_K)  # if h2o_density == None, calculate density from temp
         else:
             self.h2o_density = (1 - 0.01 * self.h2o_void_percent) * h2o_density
+
+        if not d2o_density:
+            self.d2o_density = (1 - 0.01 * self.d2o_void_percent) * d2o_temp_K_to_mass_density(d2o_temp_K)  # if d2o_density == None, calculate density from temp
+        else:
+            self.d2o_density = (1 - 0.01 * self.d2o_void_percent) * d2o_density
 
         ''' Fuel properties'''
         self.fuel_density = fuel_density
@@ -123,7 +126,7 @@ class MCNP_File:
         self.chain_a_surfaces, self.chain_b_surfaces = self.write_cube_surfaces()
         self.core_fuel_cells_complements = self.write_cells_complements_str()
         self.ksrc_card = self.write_ksrc_card()
-        print(self.core_fuel_cells_complements)
+        # print(self.core_fuel_cells_complements)
 
         """
         Load variables into dictionary to be pasted into the template
