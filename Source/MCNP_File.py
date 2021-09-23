@@ -70,12 +70,15 @@ class MCNP_File:
 
         ''' Heavy and light water moderator properties '''
         self.h2o_temp_K = h2o_temp_K
-        # self.h2o_void_percent = h2o_void_percent
+        self.h2o_void_percent = h2o_void_percent
         if not h2o_density:
             self.h2o_density = (1 - 0.01 * self.h2o_void_percent) * h2o_temp_K_to_mass_density(h2o_temp_K)  # if h2o_density == None, calculate density from temp
         else:
             self.h2o_density = (1 - 0.01 * self.h2o_void_percent) * h2o_density
 
+        self.d2o_temp_K = d2o_temp_K
+        self.d2o_void_percent = d2o_void_percent
+        self.d2o_purity = d2o_purity
         if not d2o_density:
             self.d2o_density = (1 - 0.01 * self.d2o_void_percent) * d2o_temp_K_to_mass_density(d2o_temp_K)  # if d2o_density == None, calculate density from temp
         else:
@@ -135,7 +138,8 @@ class MCNP_File:
                            'run_type': self.run_type,
                            # 'run_desc': RUN_DESCRIPTIONS_DICT[self.run_type],
                            'core_number': self.core_number,
-                           # 'core_config': self.core_config_dict,
+                           'r_tank' : self.r_tank,
+                           'h_tank' : self.h_tank,
                            'core_fuel_cells_complements': self.core_fuel_cells_complements,
                            'core_fuel_cells': self.core_cells,
                            # 'chain_a_cube_cells_complements': self.chain_a_cube_cells_complements,
@@ -146,15 +150,19 @@ class MCNP_File:
                            'mode': ' n ',
                            'grph_density': f'-{self.grph_density}', # -wt, +at
                            'h2o_density': f'-{self.h2o_density}',  # - for mass density, + for atom density
-                           'd2o_density': f'-{self.h2o_density}',  # - for mass density, + for atom density
-                           'h_mats': self.h2o_mat_interpolated_str,
-                           'o_xs_lib': self.o_xs_lib,
-                           'h2o_sab_lib': self.h2o_sab_lib,
+                           'd2o_density': f'-{self.d2o_density}',  # - for mass density, + for atom density
+                           'h2o_mats_interpolated': self.h2o_mats_interpolated_str,
+                           'd2o_mats_interpolated': self.d2o_mats_interpolated_str,
+                           # 'o_xs_lib': self.o_xs_lib, # unused, redundant with interpolated str
+                           'h_h2o_sab_lib': self.h_h2o_sab_lib,
+                           'd_d2o_sab_lib': self.d_d2o_sab_lib, 
+                           'o_d2o_sab_lib': self.o_d2o_sab_lib,
                            'h2o_temp_MeV': '{:.6e}'.format(self.h2o_temp_K * MEV_PER_KELVIN),
                            'fuel_temp_MeV': '{:.6e}'.format(self.fuel_temp_K * MEV_PER_KELVIN),
+                           'fuel_density': f'-{self.fuel_density}', # nominal 19.05 g/cc
                            # 'fuel_mats': self.fuel_mat_cards, # all cubes uniform
                            'ksrc_card': self.ksrc_card,
-                           'n_per_cycle': 20000, # 20k for testing, 100k for production
+                           'n_per_cycle': 100000, # 20k for testing, 100k for production
                            'discard_cycles': 15,
                            'kcode_cycles': 115,
                            }
@@ -172,6 +180,9 @@ class MCNP_File:
 
         if self.run_type in ['base','sdm', 'cxs']:
             self.input_filename = f"{self.base_filename}_{self.run_type}" \
+                                  f".i"
+        elif self.run_type in ['dens_fuel']:
+            self.input_filename = f"{self.base_filename}_{self.run_type}_{'{:.2f}'.format(self.fuel_density).replace('.','')}" \
                                   f".i"
 
         else:
@@ -210,7 +221,8 @@ class MCNP_File:
         if self.ring_radii_list is None:
             self.ring_radii_list = []
             for ring_number in self.ring_number_list:
-                radius_increment = self.r_tank / (self.n_rings + 1)
+                # radius_increment = self.r_tank / (self.n_rings + 1)
+                radius_increment = (self.r_tank + 5 * np.sqrt(2) / 2) / (self.n_rings + 1)
                 new_radius = radius_increment * ring_number
                 self.ring_radii_list.append(round(new_radius, 6))
 
@@ -399,42 +411,39 @@ class MCNP_File:
         self.h_xs_lib, self.o_xs_lib = mat_list[2][0], mat_list[3][0]  # KEEP
 
         """
-        find mat libraries for light water isotopes
+        find mat libraries for water materials
         """
-        self.h2o_mat_interpolated_str = h2o_temp_K_interpolate_mat(self.h2o_temp_K)  # Utilities.py
+        self.h2o_mats_interpolated_str = wtr_interpolate_mat(self.h2o_temp_K, d2o_atom_percent=0)
+        self.d2o_mats_interpolated_str = wtr_interpolate_mat(self.d2o_temp_K, d2o_atom_percent=self.d2o_purity)
         try:
-            self.o_xs_lib = O_TEMPS_K_XS_DICT[self.h2o_temp_K]
+            self.o_xs_lib = O_TEMPS_K_XS_DICT[self.d2o_temp_K]
         except:
-            closest_temp_K = find_closest_value(self.h2o_temp_K, list(O_TEMPS_K_XS_DICT.keys()))
+            closest_temp_K = find_closest_value(self.d2o_temp_K, list(O_TEMPS_K_XS_DICT.keys()))
             self.o_xs_lib = O_TEMPS_K_XS_DICT[closest_temp_K]
-            print(f"\n   comment. oxygen cross-section (xs) data at {self.h2o_temp_K} K does not exist")
+            print(f"\n   comment. oxygen cross-section (xs) data at {self.d2o_temp_K} K does not exist")
             print(f"   comment.   using closest available xs data at temperature: {closest_temp_K} K")
+        
+
 
     def find_sab_libs(self):
         # find mt libraries
         # zr mt lib not available
 
-        try:
-            self.h2o_sab_lib = H2O_TEMPS_K_SAB_DICT[self.h2o_temp_K]
-        except:
-            closest_temp_K = find_closest_value(self.h2o_temp_K, list(H2O_TEMPS_K_SAB_DICT.keys()))
-            self.h2o_sab_lib = H2O_TEMPS_K_SAB_DICT[closest_temp_K]
-            print(f"\n   comment. light water scattering S(a,B) data at {self.h2o_temp_K} K does not exist")
-            print(f"   comment.   using closest available S(a,B) data at temperature: {closest_temp_K} K")
+        sab_list = [[None, H2O_TEMPS_K_SAB_DICT, 'h-h2o', self.h2o_temp_K],
+                   [None, D_D2O_TEMPS_K_SAB_DICT, 'd-d2o', self.d2o_temp_K],
+                   [None, O_D2O_TEMPS_K_SAB_DICT, 'o-d2o', self.d2o_temp_K],]
 
-        mt_list = [[None, ZR_H_TEMPS_K_SAB_DICT, 'zr_h'],
-                   [None, H_ZR_TEMPS_K_SAB_DICT, 'h_zr']]
-
-        for i in range(0, len(mt_list)):
+        for i in range(0, len(sab_list)):
             try:
-                mt_list[i][0] = mt_list[i][1][self.fuel_temp_K]
+                sab_list[i][0] = sab_list[i][1][sab_list[i][3]]
             except:
-                closest_temp_K = find_closest_value(self.fuel_temp_K, list(mt_list[i][1].keys()))
-                mt_list[i][0] = mt_list[i][1][closest_temp_K]
-                print(f"\n   comment. {mt_list[i][2]} scattering S(a,B) data at {self.fuel_temp_K} does not exist")
+                closest_temp_K = find_closest_value(sab_list[i][3], list(sab_list[i][1].keys()))
+                sab_list[i][0] = sab_list[i][1][closest_temp_K]
+                print(f"\n   comment. {sab_list[i][2]} scattering S(a,B) data at {sab_list[i][3]} does not exist")
                 print(f"   comment.   using closest available S(a,B) data at temperature: {closest_temp_K} K")
 
-        self.zr_h_sab_lib, self.h_zr_sab_lib = mt_list[0][0], mt_list[1][0]
+        self.h_h2o_sab_lib, self.d_d2o_sab_lib, self.o_d2o_sab_lib = sab_list[0][0], sab_list[1][0], sab_list[2][0]
+
 
     def move_mcnp_files(self, output_types_to_move=['.o', '.r', '.s', '.msht']):
         """ Moves files to appropriate folder.
@@ -506,23 +515,29 @@ class MCNP_File:
         Parses output file for neutron multiplication factor, keff, and its uncertainty.
         """
         if os.path.exists(self.results_folder):
-            try:
+            #try:
                 get_keff = False
+                get_therm_n_frac = False
                 found_keff = False
+
                 with open(self.output_filepath) as f:
                     for line in f:
-                        if found_keff:
-                            return
-                        else:
-                            if line.startswith(" the estimated average keffs"):
-                                get_keff = True
-                            elif get_keff and line.startswith("       col/abs/trk len"):
-                                self.keff, self.keff_unc = float(line.split()[2]), float(line.split()[3])
-                                found_keff = True
-                                print(f' keff: {self.keff} +/- {self.keff_unc}')
-            except:
-                print(f"\n   warning. keff not found in {self.output_filepath}")
-                print(f"   warning.   skipping {self.output_filepath}")
+                        # if found_keff:
+                        #     return
+                        # else:
+                        if len(line.split()) > 2 and line.split()[1]=='(<0.625':
+                            self.therm_n_frac = float(line.split()[3].replace('%',''))
+                            print(f' thermal neutron % = {self.therm_n_frac}')
+
+                        if line.startswith(" the estimated average keffs"):
+                            get_keff = True
+                        elif get_keff and line.startswith("       col/abs/trk len"):
+                            self.keff, self.keff_unc = float(line.split()[2]), float(line.split()[3])
+                            found_keff = True
+                            print(f' keff: {self.keff} +/- {self.keff_unc}')
+            #except:
+            #    print(f"\n   warning. keff not found in {self.output_filepath}")
+            #    print(f"   warning.   skipping {self.output_filepath}")
         else:
             print(f'\n   fatal. cannot find {self.results_folder}\n')
             sys.exit(2)

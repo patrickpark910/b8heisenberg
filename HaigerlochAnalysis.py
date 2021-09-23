@@ -155,16 +155,16 @@ def ReedAutomatedNeutronicsEngine(argv):
             """ URANIUM DENSITY
             """
             for fuel_density in FUEL_DENSITIES:
-                current_run = Density(run_type,
-                                       tasks,
-                                       core_number=core_number,
-                                       print_input=check_mcnp,
-                                       fuel_density=fuel_density
-                                       )
+                current_run = DensityFuel(run_type,
+                                          tasks,
+                                          core_number=core_number,
+                                          print_input=check_mcnp,
+                                          fuel_density=fuel_density
+                                          )
                 if check_mcnp:
                     current_run.run_mcnp()
                     current_run.move_mcnp_files(output_types_to_move=['.o'])  # keep as separate step from run_mcnp()
-                current_run.process_keff()
+                current_run.process_dens_fuel_keff()
 
         elif run_type == 'dens_grph':
             """ URANIUM DENSITY

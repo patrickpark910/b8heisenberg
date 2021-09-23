@@ -43,8 +43,9 @@ c ---------------
 c --Begin Cells--
 c ---------------
 c
-c Model exterior light water
-1000 10200  {{ h2o_density }} +45:-15:+17 imp:n=0 $ light water
+c Core exterior
+1    0  +46:-18:+19 imp:n=0 $ void
+1000 10200 {{ h2o_density }} (+45:-15:+17) -46 +18 -19 imp:n=1 $ light water
 c
 c Inner fuel tank
 1100 10201 {{ d2o_density }} -42 +10 -11
@@ -89,7 +90,7 @@ c
 c aluminum chain
 100008 10301 -2.68 -11 -41 +10
                 #800001 #800002 #800003 #800004
-                #800005 #800006 #800007 #800008 # {{ chain_a_cube_cells_complements }}
+                #800005 #800006 #800007 #800008 $ {{ chain_a_cube_cells_complements }}
                imp:n=1 u=80
 c
 800001 10001 {{ fuel_density }} -811 -812 +813 +814 -805 +806  imp:n=1 u=80 $ 8-chain cube 1
@@ -163,13 +164,15 @@ c
 c
 c
 10  pz  0    $ bottom plane of fuel assembly
-11  pz  164  $ top plane of fuel assembly
+11  pz  {{ h_tank }}  $ top plane of fuel assembly
 12  pz -0.3    $ inner tank bot thickness
-13  pz  164.3  $ inner tank top thickness
-14  pz -29   $ outer tank bot
-15  pz -29.5   $ outer tank bot thickness
-16  pz  193  $ outer tank top
-17  pz  193.5  $ outer tank top thickness
+13  pz  {{ h_tank + 0.3 }}  $ inner tank top thickness
+14  pz -45   $ outer tank bot
+15  pz -45.5   $ outer tank bot thickness
+16  pz  {{ h_tank + 39 }}  $ outer tank top
+17  pz  {{ h_tank + 39.5 }}  $ outer tank top thickness
+18  pz -105.5
+19  pz  {{ h_tank + 39.5 + 60 }}
 c
 c 20  py
 c
@@ -179,10 +182,11 @@ c
 4   cz 4.401
 40  cz  4.4  $ cyclinder of fuel universe fill - must be at least 5*sqrt(3)/2 = 4..33
 41  cz  0.2  $ OD Al string
-42  cz  62   $ OD inner tank
-43  cz  62.3   $ OD inner tank thickness
-44  cz  105    $ OD outer tank
-45  cz  105.5  $ OD outer tank thickness
+42  cz  {{ r_tank }}   $ OD inner tank
+43  cz  {{ r_tank + 0.3 }}   $ OD inner tank thickness
+44  cz  {{ r_tank + 40 }}    $ OD outer tank
+45  cz  {{ r_tank + 40.5 }}  $ OD outer tank thickness
+46  cz  {{ r_tank + 100.5 }} $ OD water reflector exterior
 c
 c 50  cy
 c
@@ -387,14 +391,13 @@ c
 c
 c ------ Light Water (H2O) ------
 c
-c Unused-- inner tank is D2O
+c Used for outer void
 c
 c Assumed to be 66..67 at% Oxygen, 33..33 at% Hydrogen
 c
-m10200   {{ h_mats }} 
-         {{ o_mat_lib }} 1.0000
+m10200   {{ h2o_mats_interpolated }}
 c
-mt10200  {{ h2o_sab_lib }}     {{ o_sab_lib }} $ thermal scattering at {{ h2o_temp_K }}
+mt10200  {{ h_h2o_sab_lib }}  $ thermal scattering at {{ h2o_temp_K }} - no o-h2o SaB lib for MCNP6.2/ENDF8
 c
 c
 c ------ Heavy Water (D2O, 96..8at%) ------
@@ -405,11 +408,9 @@ c Determined to be 96..8at% heavy, 3..2 at% light water by E.R. Smith, NBS, 1948
 c
 c Density by interpolating NIST formulae for heavy and light water densities 1..1045
 c
-m10201    {{ h_xs_lib }}  {{ h_at_frac }}
-          {{ d_xs_lib }}  {{ d_at_frac }}
-          {{ o_xs_lib }}  {{ o_at_frac }}
+m10201    {{ d2o_mats_interpolated }}
 c
-mt10201  {{ d_sab_lib }} {{ o_sab_lib }} {{ h_sab_lib }} $ thermal scattering at {{ d2o_temp_K }}
+mt10201  {{ d_d2o_sab_lib }} {{ o_d2o_sab_lib }} {{ h_h2o_sab_lib }} $ thermal scattering at {{ d2o_temp_K }}
 c
 c
 c ------ 5025 Aluminum -----
@@ -444,7 +445,7 @@ m10302  13027.00c 0.996   26054.00c 0.0056
         29063.00c 0.0086  29065.00c 0.0039
         25055.00c 0.0005
 c
-mt10301  al-27.40t    fe-56.40t  $ 294 K
+mt10302  al-27.40t    fe-56.40t  $ 294 K
 c
 c
 c ------ Magnesium alloy (AZ91) -----
@@ -470,7 +471,7 @@ c Pure elemental graphite used as the material for the reflector blank as well a
 c
 c Density 2..2 g/cc
 c
-m10600    6000.00c 1.0
+m10600    6012.00c  0.9893    6013.00c  0.0107
 c
 mt10600   grph.10t
 c
@@ -504,13 +505,13 @@ c to track, and by default it is 2*(1st entry). This model
 c has a lot of KSRC points (up to 1100), so it is probably best to
 c keep the 1st entry >> 2500
 c
-nps 1e+6
+c nps 1e+6
 mode n
 kcode {{ n_per_cycle }} 1 {{ discard_cycles }} {{ kcode_cycles }}
 kopts blocksize=10 kinetics=yes precursor=yes
 c
-fmesh4:n  GEOM= xyz    ORIGIN= -106 -106 -30
-          IMESH= 212     IINTS= 424
-          JMESH= 212     JINTS= 424
-          KMESH= 224     KINTS= 448
+c fmesh4:n  GEOM= xyz    ORIGIN= -106 -106 -30
+c           IMESH= 212     IINTS= 424
+c           JMESH= 212     JINTS= 424
+c           KMESH= 224     KINTS= 448
 c

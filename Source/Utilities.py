@@ -68,6 +68,14 @@ H_TEMPS_K_XS_DICT = {294: '1001.00c',
                      0.1: '1001.05c',
                      250: '1001.06c'}
 
+D_TEMPS_K_XS_DICT = {294: '1002.00c',
+                     600: '1002.01c',
+                     900: '1002.02c',
+                     1200: '1002.03c',
+                     2500: '1002.04c',
+                     0.1: '1002.05c',
+                     250: '1002.06c'}
+
 O_TEMPS_K_XS_DICT = {294: '8016.00c',
                      600: '8016.01c',
                      900: '8016.02c',
@@ -75,24 +83,6 @@ O_TEMPS_K_XS_DICT = {294: '8016.00c',
                      2500: '8016.04c',
                      0.1: '8016.05c',
                      250: '8016.06c'}
-
-H_ZR_TEMPS_K_SAB_DICT = {294: 'h-zrh.40t',
-                         400: 'h-zrh.41t',
-                         500: 'h-zrh.42t',
-                         600: 'h-zrh.43t',
-                         700: 'h-zrh.44t',
-                         800: 'h-zrh.45t',
-                         1000: 'h-zrh.46t',
-                         1200: 'h-zrh.47t'}
-
-ZR_H_TEMPS_K_SAB_DICT = {294: 'zr-zrh.40t',
-                         400: 'zr-zrh.41t',
-                         500: 'zr-zrh.42t',
-                         600: 'zr-zrh.43t',
-                         700: 'zr-zrh.44t',
-                         800: 'zr-zrh.45t',
-                         1000: 'zr-zrh.46t',
-                         1200: 'zr-zrh.47t'}
 
 H2O_TEMPS_K_SAB_DICT = {294: 'h-h2o.40t',
                         284: 'h-h2o.41t',
@@ -112,6 +102,42 @@ H2O_TEMPS_K_SAB_DICT = {294: 'h-h2o.40t',
                         624: 'h-h2o.55t',
                         650: 'h-h2o.56t',
                         800: 'h-h2o.57t', }
+
+D_D2O_TEMPS_K_SAB_DICT = {294: 'd-d2o.40t',
+                        284: 'd-d2o.41t',
+                        300: 'd-d2o.42t',
+                        324: 'd-d2o.43t',
+                        350: 'd-d2o.44t',
+                        374: 'd-d2o.45t',
+                        400: 'd-d2o.46t',
+                        424: 'd-d2o.47t',
+                        450: 'd-d2o.48t',
+                        474: 'd-d2o.49t',
+                        500: 'd-d2o.50t',
+                        524: 'd-d2o.51t',
+                        550: 'd-d2o.52t',
+                        574: 'd-d2o.53t',
+                        600: 'd-d2o.54t',
+                        624: 'd-d2o.55t',
+                        650: 'd-d2o.56t',}
+
+O_D2O_TEMPS_K_SAB_DICT = {294: 'o-d2o.40t',
+                        284: 'o-d2o.41t',
+                        300: 'o-d2o.42t',
+                        324: 'o-d2o.43t',
+                        350: 'o-d2o.44t',
+                        374: 'o-d2o.45t',
+                        400: 'o-d2o.46t',
+                        424: 'o-d2o.47t',
+                        450: 'o-d2o.48t',
+                        474: 'o-d2o.49t',
+                        500: 'o-d2o.50t',
+                        524: 'o-d2o.51t',
+                        550: 'o-d2o.52t',
+                        574: 'o-d2o.53t',
+                        600: 'o-d2o.54t',
+                        624: 'o-d2o.55t',
+                        650: 'o-d2o.56t',}
 
 def find_closest_value(K, lst):
     return lst[min(range(len(lst)), key=lambda i: abs(lst[i] - K))]
@@ -133,48 +159,80 @@ def get_tasks():
     return tasks  # Integer between 1 and total number of cores available.
 
 
-def h2o_temp_K_interpolate_mat(h2o_temp_K):
-    """
+def wtr_interpolate_mat(temp_K, d2o_atom_percent=0):
+    """ Patrick
     This function interpolates cross-sections
 
     example outputs:
-    print(h2o_interpolate_mat(333.15)) # C = 60, K = 333.15
-    >>> 1001.80c 1.698993390597    1001.81c 0.301006609403
-    print(h2o_interpolate_mat(250)) # C= -23.15, K = 250
-    >>> 1001.86c  2.000000000000
+    print(h2o_interpolate_mat(60)) # C = 60, K = 333.15
+    >>> 1001.80c 1.698993      1001.81c 0.301007      8016 1.00
+    
+    print(h2o_interpolate_mat(-23.15)) # C = -23.15, K = 250
+    >>> 1001.86c  2.000000  8016 1.00
+    
+    print(h2o_interpolate_mat(-23.15, d2o_atom_percent=50))
+    >>> 1001.86c  1.000000      1002.86c  1.000000      8016 1.00
+    
+    print(h2o_interpolate_mat(60, d2o_atom_percent=66))
+    >>> 1001.80c 0.577658  1001.81c 0.102342    1002.80c 1.121336  1002.81c 0.198664    8016 1.00
+    
+    print(h2o_interpolate_mat(100, d2o_atom_percent=100))
+    >>> 1002.80c  1.409220  1002.81c  0.590780  8016 1.00
 
-    ref:
-    https://mcnp.lanl.gov/pdf_files/la-ur-08-5891.pdf
-    pg 73
+    ref: https://mcnp.lanl.gov/pdf_files/la-ur-08-5891.pdf, pg 73
     """
-    K = float('{:.2f}'.format(h2o_temp_K))
-    # round to 2 decimal places to avoid floating point errors
-    # rounding to < 2 digits causes errors, since there is a dictionary for K = 0.1
-
     T_1, T_2 = None, None
+    K = float('{:.2f}'.format(float(temp_K))) # rounding to < 2 digits causes errors, since there is a dictionary for K = 0.1    
 
     for T in list(H_TEMPS_K_XS_DICT.keys()):
-        # print(T, K)
         if T == K:
             h2o_mat_lib_1, h2o_at_frac_1 = H_TEMPS_K_XS_DICT[T], 2
-            h2o_mats_interpolated = f"{h2o_mat_lib_1}  {'{:.6f}'.format(h2o_at_frac_1)}"
-            return h2o_mats_interpolated
+            wtr_mats_interpolated = f"{h2o_mat_lib_1}  {'{:.6f}'.format(h2o_at_frac_1)}  8016.00c 1.00"
+            
+            # if there is d2o ingress
+            d2o_mat_lib_1 = D_TEMPS_K_XS_DICT[T]
+            if 0 < d2o_atom_percent < 100:
+                d2o_at_frac_1 = (d2o_atom_percent/100)*h2o_at_frac_1
+                h2o_at_frac_1_new = (1-d2o_atom_percent/100)*h2o_at_frac_1
+                wtr_mats_interpolated = f"{h2o_mat_lib_1}  {'{:.6f}'.format(h2o_at_frac_1_new)}" \
+                                        f"      {d2o_mat_lib_1}  {'{:.6f}'.format(d2o_at_frac_1)}" \
+                                        f"      8016.00c 1.00"
+            elif d2o_atom_percent == 100:
+                d2o_at_frac_1 = h2o_at_frac_1
+                wtr_mats_interpolated = f"{d2o_mat_lib_1}  {'{:.6f}'.format(d2o_at_frac_1)}  8016.00c 1.00"
 
-        elif T < K:
-            if not T_1 or T > T_1:
-                T_1 = T
-                h2o_mat_lib_1 = H_TEMPS_K_XS_DICT[T_1]
+            return wtr_mats_interpolated            
 
-        elif T > K:
-            if not T_2 or T < T_2:
-                T_2 = T
-                h2o_mat_lib_2 = H_TEMPS_K_XS_DICT[T_2]
+        else: 
+            if T < K:
+                if not T_1 or T > T_1:
+                  T_1 = T
+                  h2o_mat_lib_1, d2o_mat_lib_1 = H_TEMPS_K_XS_DICT[T_1], D_TEMPS_K_XS_DICT[T_1]
+              
+            elif T > K:
+                if not T_2 or T < T_2:
+                  T_2 = T
+                  h2o_mat_lib_2, d2o_mat_lib_2 = H_TEMPS_K_XS_DICT[T_2], D_TEMPS_K_XS_DICT[T_2]
 
-    h2o_at_frac_2 = 2 * ((np.sqrt(K) - np.sqrt(T_1)) / (np.sqrt(T_2) - np.sqrt(T_1)))
+    h2o_at_frac_2 = 2 * ((np.sqrt(K) - np.sqrt(T_1))/(np.sqrt(T_2) - np.sqrt(T_1)))
     h2o_at_frac_1 = 2 - h2o_at_frac_2
-    h2o_mats_interpolated = f"{h2o_mat_lib_1} {'{:.6f}'.format(h2o_at_frac_1)}    {h2o_mat_lib_2} {'{:.6f}'.format(h2o_at_frac_2)}"
 
-    return h2o_mats_interpolated
+    wtr_mats_interpolated = f"{h2o_mat_lib_1} {'{:.6f}'.format(h2o_at_frac_1)}" \
+                            f"      {h2o_mat_lib_2} {'{:.6f}'.format(h2o_at_frac_2)}" \
+                            f"      8016.00c 1.00"
+    if 0 < d2o_atom_percent < 100:
+        d2o_at_frac_1 = (d2o_atom_percent/100)*h2o_at_frac_1
+        d2o_at_frac_2 = (d2o_atom_percent/100)*h2o_at_frac_2
+        h2o_at_frac_1_new = (1-d2o_atom_percent/100)*h2o_at_frac_1
+        h2o_at_frac_2_new = (1-d2o_atom_percent/100)*h2o_at_frac_2
+        wtr_mats_interpolated = f"{h2o_mat_lib_1} {'{:.6f}'.format(h2o_at_frac_1_new)}  {h2o_mat_lib_2} {'{:.6f}'.format(h2o_at_frac_2_new)}" \
+                                f"    {d2o_mat_lib_1} {'{:.6f}'.format(d2o_at_frac_1)}  {d2o_mat_lib_2} {'{:.6f}'.format(d2o_at_frac_2)}" \
+                                f"    8016.00c 1.00"      
+    elif d2o_atom_percent == 100:
+        d2o_at_frac_1, d2o_at_frac_2 = h2o_at_frac_1, h2o_at_frac_2
+        wtr_mats_interpolated = f"{d2o_mat_lib_1}  {'{:.6f}'.format(d2o_at_frac_1)}  {d2o_mat_lib_2}  {'{:.6f}'.format(d2o_at_frac_2)}  8016.00c 1.00"         
+
+    return wtr_mats_interpolated
 
 
 def interpolate_mat(frac, temp, xs_dict):
