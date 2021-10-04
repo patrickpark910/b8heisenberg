@@ -1,308 +1,384 @@
-"""
-VOID COEFFICIENT (MCNP)
-
-Written by Patrick Park (RO, Physics '22)
-ppark@reed.edu
-
-Adapted from the Reed Automated Neutronics Engine for the Haigerloch project
-
-Created Mar. 13, 2021
-
-__________________
-Default MCNP units
-
-Length: cm
-Mass: g
-Energy & Temp.: MeV
-Positive density (+x): atoms/barn-cm
-Negative density (-x): g/cm3
-Time: shakes
-(1 barn = 10e-24 cm2, 1 sh = 10e-8 sec)
-
-_______________
-Technical Notes
-
-"""
-
-import os, sys, multiprocessing
+import os
+import sys
+import fnmatch
+import traceback, sys
+import fileinput
+import numpy as np
+import shutil
+import platform
+import json
+import glob
 import numpy as np
 import pandas as pd
-import matplotlib
 import matplotlib.pyplot as plt
-from scipy import stats
-from scipy.optimize import curve_fit
+from mpl_toolkits.mplot3d.axes3d import Axes3D, get_test_data
+from matplotlib import cm as cmx  
 from matplotlib.ticker import MultipleLocator, FormatStrFormatter
+import matplotlib.colors as colors
+from scipy.interpolate import UnivariateSpline
 
-from haigerloch_mcnp_funcs import *
-
-FILEPATH = os.path.dirname(os.path.abspath(__file__))
-HEAVY_WATER_MAT_CARD = '10201'
-HEAVY_WATER_DENSITIES = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0] # np.arange(start=0.1,stop=1.0,step=0.1)
-# Prefer hardcoded lists rather than np.arange, which produces imprecise floating points, e.g., 0.7000000...003
-INPUTS_FOLDER_NAME = 'inputs'
-OUTPUTS_FOLDER_NAME = 'outputs'
-MODULE_NAME = 'void'
+from MCNP_File import *
+from Utilities import *
+from Parameters import *
+from plotStyles import *
 
 
-def main():
-    initialize_rane()
-    BASE_INPUT_NAME = find_base_file(FILEPATH)
-    check_kcode(FILEPATH, BASE_INPUT_NAME)
+class Reactivity(MCNP_File):
 
-    KEFF_CSV_NAME = f'{BASE_INPUT_NAME.split(".")[0]}_keff.csv'
-    RHO_CSV_NAME = f'{BASE_INPUT_NAME.split(".")[0]}_rho.csv'
-    PARAMS_CSV_NAME = f'{BASE_INPUT_NAME.split(".")[0]}_parameters.csv'
-    FIGURE_NAME = f'{BASE_INPUT_NAME.split(".")[0]}_results.png'
+    def process_rcty_keff(self):
 
-    """
-    print("The following lines will ask desired rod heights for this calculation.")
+        """
+        Output results filepaths
+        """
+        self.keff_filename = f"{self.base_filename}_{self.run_type}_keff.csv"
+        self.keff_filepath = f"{self.results_folder}/{self.keff_filename}"
+
+        print(f'\n processing: {self.output_filename}')
+
+        self.extract_keff()
+
+        """
+        Define the index column and data to be used in dataframe
+        """
+        self.d2o_temp_C  = float('{:.2f}'.format(self.d2o_temp_K - 273))
+        self.fuel_temp_C = float('{:.2f}'.format(self.fuel_temp_K - 273)) # use 273 not 273
+        if self.run_type == 'rcty_fuel':
+            self.index_header, self.index_data = 'temp (C)', UZRH_FUEL_TEMPS_C
+            self.row_val = self.fuel_temp_C # make sure index_data and row_val use same units!
+        elif self.run_type == 'rcty_modr':
+            self.index_header, self.index_data = 'temp (C)', D2O_MOD_TEMPS_C
+            self.row_val = self.d2o_temp_C
+        elif self.run_type == 'rcty_pure':
+            self.index_header, self.index_data = 'd2o purity (at%)', D2O_MOD_PURITIES
+            self.row_val = self.d2o_purity
+
+        """
+        Setup or read keff dataframe
+        """
+        if self.keff_filename in os.listdir(self.results_folder):
+            try:
+                df_keff = pd.read_csv(self.keff_filepath, encoding='utf8')
+                df_keff.set_index(self.index_header, inplace=True)
+            except:
+                print(f"\n   fatal. Cannot read {self.keff_filename}")
+                print(f"   fatal.   Ensure that:")
+                print(f"   fatal.     - the file is a .csv")
+                print(f"   fatal.     - the index (first column) header is '{self.index_header}'")
+                sys.exit(2)
+        else:
+            print(f'\n   comment. creating new results file {self.keff_filepath}')
+            df_keff = pd.DataFrame(self.index_data, columns=[self.index_header])
+            df_keff.set_index(self.index_header, inplace=True)
+            df_keff["SaB lib"] = 0.0
+            df_keff["keff"] = 0.0 
+            df_keff["keff unc"] = 0.0 
+
+        """
+        Populate the dataframe with keff and unc values
+        """
+        if self.run_type == 'rcty_modr':
+            df_keff.loc[self.row_val, "density"] = self.d2o_density
+            df_keff.loc[self.row_val, "SaB lib"] = self.d_d2o_sab_lib
+        elif self.run_type == 'rcty_fuel':
+            df_keff.loc[self.row_val, "SaB lib"] = self.h_zr_mt_lib
+        df_keff.loc[self.row_val, "keff"] = self.keff
+        df_keff.loc[self.row_val, "keff unc"] = self.keff_unc
+        df_keff.loc[self.row_val, "therm n %"] = self.therm_n_frac
+
+        # put df in increasing order based on the index column, USE inplace=False
+        df_keff = df_keff.sort_values(by=self.index_header, ascending=True,inplace=False) 
+        
+        df_keff.to_csv(self.keff_filepath, encoding='utf8')
+
+
+    def process_rcty_rho(self):
+
+        self.rho_filename = f"{self.base_filename}_{self.run_type}_rho.csv"
+        self.rho_filepath = f"{self.results_folder}/{self.rho_filename}"
+
+        df_keff = pd.read_csv(self.keff_filepath, index_col=0)
+
+        """
+        Setup or read rho dataframe
+        """
+        if self.rho_filename in os.listdir(self.results_folder):
+            try:
+                df_rho = pd.read_csv(self.rho_filepath, encoding='utf8')
+                df_rho.set_index(self.index_header, inplace=True)
+            except:
+                print(f"\n   fatal. Cannot read {self.rho_filename}")
+                print(f"   fatal.   Ensure that:")
+                print(f"   fatal.     - the file is a .csv")
+                print(f"   fatal.     - the index (first column) header is '{self.index_header}'")
+                sys.exit(2)
+        else:
+            print(f'\n   comment. creating new results file {self.rho_filepath}')
+            df_rho = pd.DataFrame(self.index_data, columns=[self.index_header])
+            df_rho.set_index(self.index_header, inplace=True)
+            df_rho["rho"], df_rho["rho unc"] = 0.0, 0.0 
+
+        '''
+        ERROR PROPAGATION FORMULAE
+        % Delta rho = 100* frac{k2-k1}{k2*k1}
+        numerator = k2-k1
+        delta num = sqrt{(delta k2)^2 + (delta k1)^2}
+        denominator = k2*k1
+        delta denom = k2*k1*sqrt{(frac{delta k2}{k2})^2 + (frac{delta k1}{k1})^2}
+        delta % Delta rho = 100*sqrt{(frac{delta num}{num})^2 + (frac{delta denom}{denom})^2}
+        '''
+        for x_value in self.index_data:
+            k1 = df_keff.loc[x_value, 'keff']
+            k2 = df_keff.loc[min(self.index_data), 'keff']
+            dk1 = df_keff.loc[x_value, 'keff unc']
+            dk2 = df_keff.loc[min(self.index_data), 'keff unc']
+            k2_minus_k1 = k2 - k1
+            k2_times_k1 = k2 * k1
+            d_k2_minus_k1 = np.sqrt(dk2 ** 2 + dk1 ** 2)
+            d_k2_times_k1 = k2 * k1 * np.sqrt((dk2 / k2) ** 2 + (dk1 / k1) ** 2)
+            rho = (k1 - k2) / (k2 * k1) * 100
+            dollars = 0.01 * rho / BETA_EFF
+
+            df_rho.loc[x_value, 'rho'] = rho
+            df_rho.loc[x_value, 'dollars'] = dollars
+            # while the 'dollars' (and 'dollars unc') columns are not in the original df_rho definition,
+            # simply defining a value inside it automatically adds the column
+            if k2_minus_k1 != 0:
+                rho_unc = rho * np.sqrt((d_k2_minus_k1 / k2_minus_k1) ** 2 + (d_k2_times_k1 / k2_times_k1) ** 2)
+                dollars_unc = rho_unc / 100 / BETA_EFF
+                df_rho.loc[x_value, 'rho unc'], df_rho.loc[x_value, 'dollars unc'] = rho_unc, dollars_unc
+            else:
+                df_rho.loc[x_value, 'rho unc'], df_rho.loc[x_value, 'dollars unc'] = 0, 0
+
+        print(f"\nDataframe of rho values and their uncertainties:\n{df_rho}\n")
+        df_rho.to_csv(self.rho_filepath, encoding='utf8')
+
+
+    def process_rcty_coef(self):
+        ''' Translate df_rho to df_coef 
+        '''
+        self.coef_filename = f"{self.base_filename}_{self.run_type}_coef.csv"
+        self.coef_filepath = f"{self.results_folder}/{self.coef_filename}"
+
+        print(f'\n Calculating coef from: {self.rho_filepath} \n')
+        try:
+            df_rho = pd.read_csv(self.rho_filepath)
+            df_rho.set_index(self.index_header, inplace=True)
+            df_coef = df_rho.copy()
+        except:
+            print(f'\n   fatal. (ReactivityOutputFile.py) error converting rho csv to coef csv \n')
+            sys.exit()
+
+        for col in [c for c in df_rho if 'unc' not in c]:
+            for x in list(df_rho.index.values):
+                try: 
+                    if x == min(self.index_data):
+                        df_coef.loc[x, col] = 0.0
+                        df_coef.loc[x, col+' unc'] = 0.0
+                    else:
+                        dx = x - min(list(df_rho.index.values))
+                        coef, coef_unc = df_rho.loc[x, col]/dx, df_rho.loc[x, col+' unc']/dx # don't divide unc by dx
+                        df_coef.loc[x, col] = coef
+                        df_coef.loc[x, col+' unc'] = coef_unc
+                except:
+                    print(f"\n   warning. (ReactivityOutputFile.py) error calculating coef for value {x} in cycle state {col}.")
+                    print(f"   warning. It is possible you did not specify calculations to be run for cycle state {col}.") 
+                    print(f"   warning. Skipping... \n")
+
+        df_coef.to_csv(self.coef_filepath, encoding='utf8')
+
+
+    def plot_rcty_coef(self):
+
+        df_keff = pd.read_csv(self.keff_filepath)
+        df_rho  = pd.read_csv(self.rho_filepath)
+        df_coef = pd.read_csv(self.coef_filepath)
+
+        df_keff['keff unc'] = 3 * df_keff['keff unc'] # get 3-sigma errors bc 1-sigma (default) is too small
+        df_rho['rho unc'] = 3 * df_rho['rho unc'] # get 3-sigma errors bc 1-sigma (default) is too small
+        # df_coef['coef unc'] = 3 * df_coef['dollars unc'] # get 3-sigma errors bc 1-sigma (default) is too small
+
+        df_keff.set_index(self.index_header, inplace=True)
+        df_rho.set_index(self.index_header, inplace=True)
     
-    rod_heights_dict = {}
-    for rod in RODS:
-        height = input(f"Input desired integer height for the {rod} rod: ")
-        rod_heights_dict[rod] = height
-    
-    input_created = change_rod_height(FILEPATH, MODULE_NAME, rod_heights_dict, BASE_INPUT_NAME, INPUTS_FOLDER_NAME)
-    if input_created: print(f"Created {num_inputs_created} new input deck.")
-    if not input_created: print(f"\n--Skipped {num_inputs_skipped} input deck because it already exists.")
-    """
-
-    num_inputs_created = 0
-    num_inputs_skipped = 0
-    for i in range(0, len(HEAVY_WATER_DENSITIES)):
-        cell_densities_dict = {HEAVY_WATER_MAT_CARD: HEAVY_WATER_DENSITIES[i]}
-        input_created = change_cell_densities(FILEPATH, MODULE_NAME, cell_densities_dict, BASE_INPUT_NAME, INPUTS_FOLDER_NAME)
-        if input_created: num_inputs_created += 1
-        if not input_created: num_inputs_skipped += 1
-
-    print(f"Created {num_inputs_created} new input decks.\n"
-          f"--Skipped {num_inputs_skipped} input decks because they already exist.")
-
-    if not check_run_mcnp(): sys.exit()
-
-    # Run MCNP for all .i files in f".\{inputs_folder_name}".
-    tasks = get_tasks()
-    for file in os.listdir(f"{FILEPATH}/{INPUTS_FOLDER_NAME}"):
-        run_mcnp(FILEPATH,f"{FILEPATH}/{INPUTS_FOLDER_NAME}/{file}",OUTPUTS_FOLDER_NAME,tasks)
-
-    # Deletes MCNP runtape and source dist files.
-    delete_files(f"{FILEPATH}/{OUTPUTS_FOLDER_NAME}",r=True,s=True)
-
-    # Setup a dataframe to collect keff values
-    keff_df = pd.DataFrame(columns=["density", "keff", "keff unc"]) # use lower cases to match 'rods' def above
-    keff_df["density"] = HEAVY_WATER_DENSITIES
-    keff_df.set_index("density",inplace=True)
-
-    for water_density in HEAVY_WATER_DENSITIES:
-        keff, keff_unc = extract_keff(f"{FILEPATH}/{OUTPUTS_FOLDER_NAME}/o_{BASE_INPUT_NAME.split('.')[0]}-{MODULE_NAME}-m{HEAVY_WATER_MAT_CARD}-{''.join(c for c in str(water_density) if c not in '.')}.o")
-        keff_df.loc[water_density, 'keff'] = keff
-        keff_df.loc[water_density, 'keff unc'] = keff_unc
-
-    print(f"\nDataframe of keff values and their uncertainties:\n{keff_df}\n")
-    keff_df.to_csv(KEFF_CSV_NAME)
-
-    convert_keff_to_rho_coef(KEFF_CSV_NAME, RHO_CSV_NAME)
-    calc_params_coef(RHO_CSV_NAME, PARAMS_CSV_NAME, MODULE_NAME)
-    for rho_or_dollars in ['rho','dollars']: plot_data_void(KEFF_CSV_NAME, RHO_CSV_NAME, PARAMS_CSV_NAME, FIGURE_NAME, rho_or_dollars, for_fun=True)
-
-    print(f"\n************************ PROGRAM COMPLETE ************************\n")
+        # bank = self.rod_heights_dict['bank']
+        if self.run_type == 'rcty_modr':
+            self.rcty_label   = 'moderator' # line label
+            self.x_axis_label = f'Water temperature [°C]' # ({bank}% bank)' # x axis label
+            self.y_axis_label = 'Moderator temp. coef.' # y axis label of 3rd plot (axs[2])
+            self.y_axis_label_unit = '°C' # unit to use on y axis label of 2nd & 3rd plots (axs[1], axs[2])
+        elif self.run_type == 'rcty_fuel':
+            self.rcty_label   = 'fuel' 
+            self.x_axis_label = f'Fuel temperature [°C]' # ({bank}% bank)'
+            self.y_axis_label = 'Fuel temp. coef.'
+            self.y_axis_label_unit = '°C'
+        elif self.run_type == 'rcty_void':
+            self.rcty_label   = 'void' 
+            self.x_axis_label = f'Water void [at%]' # ({bank}% bank)'
+            self.y_axis_label = 'Void coefficient'
+            self.y_axis_label_unit = 'g/cc'
+        else:
+            print("\n   fatal. reactivity coefficent plot labels not defined")
+            sys.exit()
 
 
+        for rho_or_dollars in ['rho', 'dollars']:
+            fig, axs = plt.subplots(3,1, figsize=FIGSIZE,facecolor='w',edgecolor='k')
+            axs = axs.ravel()
+
+            rods = [c for c in df_rho.columns.values.tolist() if "unc" not in c]
+            heights = list(df_keff.index.values)
+
+            # linestyle = ['-': solid, '--': dashed, '-.' dashdot, ':': dot]
+
+            for i in [0,1,2]:
+                if self.run_type in ['rcty_void']:
+                    axs[i].set_xlim([0,20])
+                    axs[i].xaxis.set_major_locator(MultipleLocator(1))
+                elif self.run_type in ['rcty_modr']:
+                    axs[i].set_xlim([15,100])
+                    axs[i].xaxis.set_major_locator(MultipleLocator(10))
+                elif self.run_type in ['rcty_fuel']:
+                    axs[i].set_xlim([0,1000])
+                    axs[i].xaxis.set_major_locator(MultipleLocator(100))
+                axs[i].set_xlabel(self.x_axis_label)
+                axs[i].autoscale(axis='y')
+                axs[i].tick_params(axis='both', which='major', length=10, direction='in', bottom=True, top=True, left=True, right=True)
+                # axs[i].grid(b=True, which='major', color='#999999', linestyle='-', linewidth='1')
+            
+            axs[0].set_ylabel(r'Eff. multiplication factor [$k_{eff}\pm 3\sigma$]')
+            axs[1].set_ylabel('Reactivity [%Δρ±3σ]')
+            if rho_or_dollars == 'dollars':
+                axs[1].set_ylabel('Reactivity [Δ$±3σ]')
+                axs[1].yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+            axs[2].set_ylabel(f'{self.y_axis_label} [%Δρ/{self.y_axis_label_unit}±3σ]')
+            if rho_or_dollars == 'dollars':
+                axs[2].set_ylabel(f'{self.y_axis_label} [Δ$/{self.y_axis_label_unit}±3σ]')
+                axs[2].yaxis.set_major_formatter(FormatStrFormatter('%.4f'))
 
 
-'''
-Plots integral and differential worths given a CSV of rho and uncertainties.
+            """
+            Keff plot
+            """
+            ax = axs[0]
 
-rho_csv_name: str, name of CSV of rho and uncertainties, e.g. "rho.csv"
-figure_name: str, desired name of resulting figure, e.g. "figure.png"
+            y     = df_keff[f"keff"].tolist()
+            y_unc = df_keff[f"keff unc"].tolist()
+            
+            ax.errorbar(heights, y, yerr=y_unc,
+                        marker=MARKER_STYLES[self.run_type], markersize=MARKER_SIZE,
+                        color=LINE_COLORS[self.run_type],
+                        ls="none", elinewidth=2, capsize=3, capthick=2)
+                        
+            if self.run_type in ['rcty_void']:
+                eq_fit = find_poly_reg(heights,y,2)['polynomial'] # Utilities.py
+                r2 = find_poly_reg(heights,y,2)['r-squared'] # Utilities.py
+                eq_fit_str = 'y= -{:.3f}$x^2$ +{:.3f}$x$ +{:.3f}'.format(np.abs(eq_fit[0]), eq_fit[1], eq_fit[2])
+            else:
+                eq_fit = find_poly_reg(heights,y,1)['polynomial'] # Utilities.py
+                r2 = find_poly_reg(heights,y,1)['r-squared'] # Utilities.py
+                eq_fit_str = 'y= {:.2e}$x$ +{:.2e}'.format(np.abs(eq_fit[0]), eq_fit[1])
 
-Does not return anything. Only produces a figure.
+            sd = np.average(np.abs(np.polyval(eq_fit, heights) - y))
+            r2_str = '{:.2f}'.format(r2)
+            sd_str = '{:.2e}'.format(sd)
 
-NB: Major plot settings have been organized into variables for your personal convenience.
-'''
-def plot_data_void(keff_csv_name, rho_csv_name, params_csv_name, figure_name, rho_or_dollars, for_fun=False):
-    if rho_or_dollars.lower() in ['r','p','rho']: rho_or_dollars = 'rho'
-    elif rho_or_dollars.lower() in ['d','dollar','dollars']: rho_or_dollars = 'dollars'
+            y_fit  = np.polyval(eq_fit,heights)
+            # spl = UnivariateSpline(heights, y) # use scipy spline to auto-fit smooth curve instead of guess-checking polyfit order
+            
+            # plot fit curve - replace 'y_fit' with 'spl(heights)' to plot smooth curve that connects-the-dots
+            ax.plot(heights, y_fit, 
+                    #label=r'{}, {}, $R^2$={}, $\Sigma$={}'.format(
+                    #    self.rcty_label.capitalize(), eq_fit_str, r2_str, sd_str),
+                    color=LINE_COLORS[self.run_type], linestyle=LINE_STYLES[self.run_type], linewidth=LINEWIDTH)
+            # ax.legend(ncol=3, loc='lower right')
+            # if self.run_type == 'rcty_fuel':
+            #     ax.legend(ncol=3, loc='upper right')
 
-    keff_df = pd.read_csv(keff_csv_name, index_col=0)
-    rho_df = pd.read_csv(rho_csv_name, index_col=0)
-    params_df = pd.read_csv(params_csv_name, index_col=0)
-    water_densities = rho_df.index.values.tolist()
+            """
+            reactivity plot
+            """
+            ax = axs[1]            
 
-    # Personal parameters, to be used in plot settings below.
-    label_fontsize = 16
-    legend_fontsize = "x-large"
-    # fontsize: int or {'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}
-    my_dpi = 320
-    x_label = r"Heavy water density "# (g/cm$^3$)"
-    y_label_keff, y_label_rho, y_label_void = r"Effective multiplication factor ($k_{eff}$)", \
-                                              r"Reactivity ($\%\Delta k/k$)", \
-                                              r"Void coefficient ((%$\Delta k/k$)/%)"
-    if rho_or_dollars == 'dollars':
-        y_label_rho, y_label_void= r"Reactivity ($\Delta$\$)", r"Void coefficient (\$/%)"
+            y     = df_rho[f"rho"].tolist()
+            y_unc = df_rho[f"rho unc"].tolist()
+            if rho_or_dollars == 'dollars':
+                y     = df_rho[f"dollars"].tolist()
+                y_unc = df_rho[f"dollars unc"].tolist()
 
-    plot_color = ["tab:red","tab:blue","tab:green"]
+            # Data points with error bars
+            ax.errorbar(heights, y, yerr=y_unc,
+                        marker=MARKER_STYLES[self.run_type], markersize=MARKER_SIZE,
+                        color=LINE_COLORS[self.run_type],
+                        ls="none", elinewidth=2, capsize=3, capthick=2)
 
-    ax_x_min, ax_x_max = 0.05, 1.05
-    ax_x_major_ticks_interval, ax_x_minor_ticks_interval = 0.1, 0.025
-    if for_fun:
-        ax_x_min, ax_x_max = 0, 2
-        ax_x_major_ticks_interval, ax_x_minor_ticks_interval = 0.1, 0.05
+            # fit data to polynomial
+            eq_fit = find_poly_reg(heights,y,1)['polynomial'] # Utilities.py
+            r2 = find_poly_reg(heights,y,1)['r-squared'] # Utilities.py
+            eq_fit_str = poly_to_latex(eq_fit) # Utilities.py
 
-    ax_keff_y_min, ax_keff_y_max = 0.85, 1.10
-    ax_keff_y_major_ticks_interval, ax_keff_y_minor_ticks_interval = 0.05, 0.01
+            sd = np.average(np.abs(np.polyval(eq_fit, heights) - y))
+            r2_str = '{:.2f}'.format(r2)
+            sd_str = '{:.2e}'.format(sd)
 
-    ax_rho_y_min, ax_rho_y_max = -16, 1
-    ax_rho_y_major_ticks_interval, ax_rho_y_minor_ticks_interval = 2, 1
-    if rho_or_dollars == 'dollars':
-        ax_rho_y_min, ax_rho_y_max = -21, 1.0
-        ax_rho_y_major_ticks_interval, ax_rho_y_minor_ticks_interval = 2, 1
+            y_fit  = np.polyval(eq_fit,heights)
+            # spl = UnivariateSpline(heights, y) # use scipy spline to auto-fit smooth curve instead of guess-checking polyfit order
+            
+            # plot fit curve - replace 'y_fit' with 'spl(heights)' to plot smooth curve that connects-the-dots
+            if self.run_type in ['rcty_fuel']:
+                ax.plot(heights, y_fit, 
+                        label=r'{}, $R^2$={}, $\Sigma$={}'.format(
+                            eq_fit_str, r2_str, sd_str),
+                        color=LINE_COLORS[self.run_type], linestyle=LINE_STYLES[self.run_type], linewidth=LINEWIDTH)
+            else:
+                ax.plot(heights, y_fit, 
+                        color=LINE_COLORS[self.run_type], linestyle=LINE_STYLES[self.run_type], linewidth=LINEWIDTH)
+            # ax.legend(ncol=3, loc='lower right')
+            # if self.run_type == 'rcty_fuel':
+            #     ax.legend(ncol=3, loc='upper right')
 
-    ax_void_y_min, ax_void_y_max = -0.4, 0.1
-    ax_void_y_major_ticks_interval, ax_void_y_minor_ticks_interval = 0.1, 0.025
-    if rho_or_dollars == 'dollars':
-        ax_void_y_min, ax_void_y_max = -0.5, 0.1
-        ax_void_y_major_ticks_interval, ax_void_y_minor_ticks_interval = 0.1, 0.025
+            """
+            reactivity coefficient plot
+            """
+            ax = axs[2]
+            x_min, x_idx = min(heights), heights.index(min(heights))
+            heights = [h for h in heights if h != x_min]
+            y     = [j for j in df_coef[f"rho"].tolist() if j != df_coef[f"rho"].tolist()[x_idx]]
+            y_unc = [j for j in df_coef[f"rho unc"].tolist() if j != df_coef[f"rho unc"].tolist()[x_idx]]
 
-    fig, axs = plt.subplots(3, 1, figsize=(1636 / 96, 3 * 673 / 96), dpi=my_dpi, facecolor='w', edgecolor='k')
-    ax_keff, ax_rho, ax_void = axs[0], axs[1], axs[2]  # integral, differential worth on top, bottom, resp.
+            if rho_or_dollars == 'dollars':
+                y     = [j for j in df_coef[f"dollars"].tolist() if j != df_coef[f"dollars"].tolist()[x_idx]]
+                y_unc = [j for j in df_coef[f"dollars unc"].tolist() if j != df_coef[f"dollars unc"].tolist()[x_idx]]
 
-    # Plot data for keff.
-    x = [water_density for water_density in water_densities if water_density <= 1]
-    if for_fun: x = water_densities
-    x_fit = np.linspace(min(x), max(x), len(water_densities))
-    y_keff, y_keff_unc = [], []
-    for water_density in x:
-        y_keff.append(keff_df.loc[water_density,'keff']), y_keff_unc.append(keff_df.loc[water_density,'keff unc'])
+            # Data points with error bars
+            ax.errorbar(heights, y, yerr=y_unc,
+                        marker=MARKER_STYLES[self.run_type], markersize=MARKER_SIZE,
+                        color=LINE_COLORS[self.run_type],
+                        ls="none", elinewidth=2, capsize=3, capthick=2)
 
-    ax_keff.errorbar(x, y_keff, yerr=y_keff_unc,
-                     marker="o", ls="none",
-                     color=plot_color[0], elinewidth=2, capsize=3, capthick=2)
+            # fit data to polynomial
+            eq_fit = find_poly_reg(heights, y,1)['polynomial'] # Utilities.py
+            r2 = find_poly_reg(heights, y,1)['r-squared'] # Utilities.py
+            eq_fit_str = 'y= {:.2e}$x$ {:.2e}'.format(np.abs(eq_fit[0]), eq_fit[1])
 
-    eq_keff = find_poly_reg(x, y_keff, 2)['polynomial']  # n=2 order fit
-    r2_keff = find_poly_reg(x, y_keff, 2)['r-squared']
-    sd_keff = np.average(np.abs(np.polyval(np.polyfit(x, y_keff, 2), x) - y_keff))
-    y_fit_keff = np.polyval(eq_keff, x)
+            sd = np.average(np.abs(np.polyval(eq_fit, heights) - y))
+            r2_str = '{:.2f}'.format(r2)
+            sd_str = '{:.2e}'.format(sd)
 
-    ax_keff.plot(x, y_fit_keff, color=plot_color[0],
-                 label=r'y=-{:.3f}$x^2$+{:.2f}$x$+{:.2f},  $R^2$={:.2f},  $\sigma$={:.4f}'.format(
-                     np.abs(eq_keff[0]),eq_keff[1], eq_keff[2], r2_keff, sd_keff))
-
-    # Plot data for reactivity
-    y_rho, y_rho_unc = [], []
-    for water_density in x:
-        if rho_or_dollars == 'rho': y_rho.append(rho_df.loc[water_density,'rho']), y_rho_unc.append(rho_df.loc[water_density,'rho unc'])
-        if rho_or_dollars == 'dollars': y_rho.append(rho_df.loc[water_density, 'dollars']), y_rho_unc.append(rho_df.loc[water_density, 'dollars unc'])
-
-    ax_rho.errorbar(x, y_rho, yerr=y_rho_unc,
-                     marker="o", ls="none",
-                     color=plot_color[1], elinewidth=2, capsize=3, capthick=2)
-
-    eq_rho = find_poly_reg(x, y_rho, 2)['polynomial']  # n=2 order fit
-    r2_rho = find_poly_reg(x, y_rho, 2)['r-squared']
-    sd_rho = np.average(np.abs(np.polyval(np.polyfit(x, y_rho, 2), x) - y_rho))
-    y_fit_rho = np.polyval(eq_rho, x_fit)
-
-    ax_rho.plot(x_fit, y_fit_rho, color=plot_color[1],
-                label=r'y=-{:.1f}$x^2$+{:.0f}$x${:.0f},  $R^2$={:.2f},  $\sigma$={:.2f}'.format(
-                    np.abs(eq_rho[0]), eq_rho[1], eq_rho[2], r2_rho, sd_rho))
-
-    # Plot data for coef_void
-    y_void, y_void_unc = [], []
-    for water_density in x:
-        if rho_or_dollars == 'rho': y_void.append(params_df.loc[water_density,'coef rho']), y_void_unc.append(params_df.loc[water_density, 'coef rho unc'])
-        else: y_void.append(params_df.loc[water_density, 'coef dollars']), y_void_unc.append(params_df.loc[water_density, 'coef dollars unc'])
-
-    ax_void.errorbar(x, y_void, yerr=y_void_unc,
-                     marker="o", ls="none",
-                     color=plot_color[2], elinewidth=2, capsize=3, capthick=2)
-
-    eq_void = find_poly_reg(x, y_void, 1)['polynomial']
-    r2_void = find_poly_reg(x, y_void, 1)['r-squared']
-    sd_void = np.average(np.abs(np.polyval(np.polyfit(x, y_void, 1), x) - y_void))
-    y_fit_void = np.polyval(eq_void, x_fit)
-
-    ax_void.plot(x_fit, y_fit_void, color=plot_color[2],
-                label=r'y={:.2f}$x${:.2f},  $R^2$={:.2f},  $\bar x$$\pm\sigma$={:.3f}$\pm${:.3f}'.format(
-                    np.abs(eq_void[0]), eq_void[1], r2_void, np.mean(y_fit_void), sd_void))
-
-    eq_void_der = -1*np.polyder(eq_rho)/100  # n=2 order fit
-    y_fit_void_der = np.polyval(eq_void_der, x_fit)
-
-    ax_void.plot(x_fit, y_fit_void_der, color=plot_color[2], linestyle='dashed',
-                label=r'y={:.2f}$x${:.2f},  $\bar x$={:.3f}'.format(
-                    np.abs(eq_void_der[0]), eq_void_der[1], np.mean(y_fit_void_der)))
+            y_fit  = np.polyval(eq_fit,heights)
+            # spl = UnivariateSpline(heights, y) # use scipy spline to auto-fit smooth curve instead of guess-checking polyfit order
+            
+            # plot fit curve - replace 'y_fit' with 'spl(heights)' to plot smooth curve that connects-the-dots
+            ax.plot(heights, y_fit, 
+                    #label=r'{}, {}, $R^2$={}, $\Sigma$={}'.format(
+                    #    self.rcty_label.capitalize(), eq_fit_str, r2_str, sd_str),
+                    color=LINE_COLORS[self.run_type], linestyle=LINE_STYLES[self.run_type], linewidth=LINEWIDTH)
+            # ax.legend(ncol=3, loc='upper right')
 
 
-
-
-    # Keff plot settings
-    # ax_keff.set_xlim([ax_x_min, ax_x_max])
-    # ax_keff.set_ylim([ax_keff_y_min, ax_keff_y_max])
-     #ax_keff.xaxis.set_major_locator(MultipleLocator(ax_x_major_ticks_interval))
-    # ax_keff.yaxis.set_major_locator(MultipleLocator(ax_keff_y_major_ticks_interval))
-    ax_keff.minorticks_on()
-    # ax_keff.xaxis.set_minor_locator(MultipleLocator(ax_x_minor_ticks_interval))
-    # ax_keff.yaxis.set_minor_locator(MultipleLocator(ax_keff_y_minor_ticks_interval))
-    ax_keff.autoscale(enable=True, axis='both')
-
-    ax_keff.tick_params(axis='both', which='major', labelsize=label_fontsize)
-    ax_keff.grid(b=True, which='major', color='#999999', linestyle='-', linewidth='1')
-    ax_keff.grid(which='minor', linestyle=':', linewidth='1', color='gray')
-
-    ax_keff.set_xlabel(x_label, fontsize=label_fontsize)
-    ax_keff.set_ylabel(y_label_keff, fontsize=label_fontsize)
-    ax_keff.legend(title=f'Key', title_fontsize=legend_fontsize, ncol=1, fontsize=legend_fontsize, loc='lower right')
-
-
-    # Reactivity worth plot settings
-    ax_rho.set_xlim([ax_x_min, ax_x_max])
-    ax_rho.set_ylim([ax_rho_y_min, ax_rho_y_max])
-    ax_rho.xaxis.set_major_locator(MultipleLocator(ax_x_major_ticks_interval))
-    ax_rho.yaxis.set_major_locator(MultipleLocator(ax_rho_y_major_ticks_interval))
-    ax_rho.minorticks_on()
-    ax_rho.xaxis.set_minor_locator(MultipleLocator(ax_x_minor_ticks_interval))
-    ax_rho.yaxis.set_minor_locator(MultipleLocator(ax_rho_y_minor_ticks_interval))
-
-    # Use for 2 decimal places after 0. for dollars units
-    if rho_or_dollars == "dollars": ax_rho.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
-
-    ax_rho.tick_params(axis='both', which='major', labelsize=label_fontsize)
-    ax_rho.grid(b=True, which='major', color='#999999', linestyle='-', linewidth='1')
-    ax_rho.grid(which='minor', linestyle=':', linewidth='1', color='gray')
-
-    ax_rho.set_xlabel(x_label, fontsize=label_fontsize)
-    ax_rho.set_ylabel(y_label_rho, fontsize=label_fontsize)
-    ax_rho.legend(title=f'Key', title_fontsize=legend_fontsize, ncol=1, fontsize=legend_fontsize, loc='lower right')
-
-
-    # Void worth plot settings
-    ax_void.set_xlim([ax_x_min, ax_x_max])
-    ax_void.set_ylim([ax_void_y_min, ax_void_y_max])
-    ax_void.xaxis.set_major_locator(MultipleLocator(ax_x_major_ticks_interval))
-    ax_void.yaxis.set_major_locator(MultipleLocator(ax_void_y_major_ticks_interval))
-    ax_void.minorticks_on()
-    ax_void.xaxis.set_minor_locator(MultipleLocator(ax_x_minor_ticks_interval))
-    ax_void.yaxis.set_minor_locator(MultipleLocator(ax_void_y_minor_ticks_interval))
-
-
-    # Use for 2 decimal places after 0. for dollars units
-    if rho_or_dollars == "dollars": ax_void.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
-
-    ax_void.tick_params(axis='both', which='major', labelsize=label_fontsize)
-    ax_void.grid(b=True, which='major', color='#999999', linestyle='-', linewidth='1')
-    ax_void.grid(which='minor', linestyle=':', linewidth='1', color='gray')
-
-    ax_void.set_xlabel(x_label, fontsize=label_fontsize)
-    ax_void.set_ylabel(y_label_void, fontsize=label_fontsize)
-    ax_void.legend(title=f'Key', title_fontsize=legend_fontsize, ncol=1, fontsize=legend_fontsize, loc='lower right')
-
-
-    plt.savefig(f"{figure_name.split('.')[0]}_{rho_or_dollars}.{figure_name.split('.')[-1]}", bbox_inches='tight',
-                pad_inches=0.1, dpi=my_dpi)
-    print(
-        f"\nFigure '{figure_name.split('.')[0]}_{rho_or_dollars}.{figure_name.split('.')[-1]}' saved!\n")  # no space near \
-
-
-if __name__ == '__main__':
-    main()
+            try:
+                figure_filepath = self.results_folder+f"/{self.base_filename}_{self.run_type}_results_{rho_or_dollars}.png"
+                plt.savefig(figure_filepath, bbox_inches = 'tight', pad_inches = 0.1, dpi=320)
+            except:
+                print(f'\n   fatal. could not save plot to {figure_filepath}')
+                print(f'   fatal. you probably have the file open, or that directory does not exist \n')
+                sys.exit()

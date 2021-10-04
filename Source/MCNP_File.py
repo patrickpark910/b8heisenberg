@@ -184,12 +184,18 @@ class MCNP_File:
         elif self.run_type in ['dens_fuel']:
             self.input_filename = f"{self.base_filename}_{self.run_type}_{'{:.2f}'.format(self.fuel_density).replace('.','')}" \
                                   f".i"
-
+        elif self.run_type.startswith('rcty'):
+            if 'modr' in self.run_type:
+                var = str(round(self.d2o_temp_K-273)).zfill(2) + "C" # ex: 01C, 10C, 20C, etc.
+                '''
+                elif 'fuel' in self.run_type:
+                    var = str(round(self.uzrh_temp_K)).zfill(4) + "K" # ex: 0001K, 0100K, 2720K, etc.
+                '''
+            elif 'pure' in self.run_type:
+                var = str(round(self.d2o_purity)).zfill(3) + "at" # ex: 000at,010at,099at, etc.
+            self.input_filename = f"{self.base_filename}_{self.run_type}_{var}.i"
         else:
-            self.input_filename = f"{self.base_filename}_{self.run_type}" \
-                                  f"_a{str(self.parameters['safe_height']).zfill(3)}" \
-                                  f"_h{str(self.parameters['shim_height']).zfill(3)}" \
-                                  f"_r{str(self.parameters['reg_height']).zfill(3)}.i"
+            self.input_filename = f"{self.base_filename}_{self.run_type}.i"
 
         self.input_filepath = f"{self.user_temp_folder}/{self.input_filename}"
         self.output_filename = f"o_{self.input_filename.split('.')[0]}.o"

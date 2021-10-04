@@ -327,3 +327,48 @@ def d2o_temp_K_to_mass_density(K):
     d2o_mass_density = float("{:.6e}".format(d2o_mass_density))
     return d2o_mass_density
 
+def find_poly_reg(x, y, degree):
+    results = {}
+    coeffs = np.polyfit(x, y, degree) # np.polyfit() object is just coefs of equation
+    # Polynomial Coefficients
+    results['polynomial'] = coeffs.tolist()
+    # r-squared
+    p = np.poly1d(coeffs)
+    # fit values, and mean
+    yhat = p(x)  # or [p(z) for z in x]
+    ybar = np.sum(y) / len(y)  # or sum(y)/len(y)
+    ssreg = np.sum((yhat - ybar) ** 2)  # or sum([ (yihat - ybar)**2 for yihat in yhat])
+    sstot = np.sum((y - ybar) ** 2)  # or sum([ (yi - ybar)**2 for yi in y])
+    results['r-squared'] = ssreg / sstot
+    return results
+
+def poly_to_latex(p):
+    """ Small function to print nicely the polynomial p as we write it in maths, in LaTeX code."""
+    coefs = p# .coef  # List of coefficient, sorted by increasing degrees
+    res = ""  # The resulting string
+    for i, a in enumerate(coefs):
+        if int(a) == a:  # Remove the trailing .0
+            a = int(a)
+        if i == 0:  # First coefficient, no need for x
+            if a > 0:
+                res += "{a} + ".format(a=a)
+            elif a < 0:  # Negative a is printed like (a)
+                res += "({a}) + ".format(a=a)
+            # a = 0 is not displayed 
+        elif i == 1:  # Second coefficient, only x and not x**i
+            if a == 1:  # a = 1 does not need to be displayed
+                res += "x + "
+            elif a > 0:
+                res += "{a} \;x + ".format(a=a)
+            elif a < 0:
+                res += "({a}) \;x + ".format(a=a)
+        else:
+            if a == 1:
+                # A special care needs to be addressed to put the exponent in {..} in LaTex
+                res += "x^{i} + ".format(i="{%d}" % i)
+            elif a > 0:
+                res += "{a} \;x^{i} + ".format(a=a, i="{%d}" % i)
+            elif a < 0:
+                res += "({a}) \;x^{i} + ".format(a=a, i="{%d}" % i)
+    return "$" + res[:-3] + "$" if res else ""
+print(poly_to_latex([1,2,3]))

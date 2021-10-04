@@ -7,6 +7,8 @@ sys.path.insert(0, "./Source/")
 from BaseCase import *
 from Parameters import *
 from Utilities import *
+from ReactivityCoefficients import *
+from plotStyles import *
 
 """
 This file uses PEP8 Python Style Guidelines.
@@ -63,6 +65,10 @@ def ReedAutomatedNeutronicsEngine(argv):
             run_types = ['base' if x == run_type else x for x in run_types]
         elif run_type.lower() in ['dens_fuel','urho','uraniumdensity']:
             run_types = ['dens_fuel' if x == run_type else x for x in run_types]
+        elif run_type.lower() in ['rm','modr','rcty_modr']:
+            run_types = ['rcty_modr' if x == run_type else x for x in run_types]
+        elif run_type.lower() in ['rp','pure','rcty_pure']:
+            run_types = ['rcty_pure' if x == run_type else x for x in run_types]
         else:
             print(f"\n  warning. run type '{run_type}' not recognized")
             run_types = [x for x in run_types if x != run_type]
@@ -72,7 +78,12 @@ def ReedAutomatedNeutronicsEngine(argv):
 
     print("\n RANE will calculate the following:")
     for run_type in run_types:
-        print(f"    {RUN_DESCRIPTIONS_DICT[run_type]}")
+        try:
+            print_desc = True
+            print(f"    {RUN_DESCRIPTIONS_DICT[run_type]}")
+        except:
+            print_desc = False
+            print(f"  warning. run type description not found")
     proceed = None
     while proceed is None:
         proceed = input(f"\n Proceed (Y/N)? ")
@@ -112,7 +123,8 @@ def ReedAutomatedNeutronicsEngine(argv):
     rane_cwd = os.getcwd()
 
     for run_type in run_types:
-        print(f"\n Currently calculating: {RUN_DESCRIPTIONS_DICT[run_type]}")
+        if print_desc:
+            print(f"\n Currently calculating: {RUN_DESCRIPTIONS_DICT[run_type]}")
 
         if run_type == 'base':
             """ BASE CASE
@@ -216,13 +228,11 @@ def ReedAutomatedNeutronicsEngine(argv):
         elif run_type == 'rcty_modr':
             """ MODERATOR TEMPERATURE COEFFICIENT
             """
-            for h2o_temp_C in H2O_MOD_TEMPS_C:
+            for d2o_temp_C in D2O_MOD_TEMPS_C:
                 current_run = Reactivity(run_type,
                                          tasks,
-                                         template_filepath=None,
                                          core_number=core_number,
-                                         rod_heights={'bank': 100},  # ECP},
-                                         h2o_temp_K=float(h2o_temp_C + 273),
+                                         d2o_temp_K=float(d2o_temp_C + 273),
                                          )
                 if check_mcnp:
                     current_run.run_mcnp()
@@ -251,25 +261,22 @@ def ReedAutomatedNeutronicsEngine(argv):
             current_run.process_rcty_coef()
             current_run.plot_rcty_coef()
 
-        elif run_type == 'rcty_void':
+        elif run_type == 'rcty_pure':
             """ VOID COEFFICIENT (MODERATOR)
             """
-            for h2o_void_percent in H2O_VOID_PERCENTS:
+            for d2o_purity in D2O_MOD_PURITIES:
                 current_run = Reactivity(run_type,
                                          tasks,
-                                         print_input=True,
-                                         template_filepath=None,
                                          core_number=core_number,
-                                         rod_heights={'bank': 100},  # ECP},
-                                         h2o_void_percent=h2o_void_percent,
+                                         d2o_purity=d2o_purity,
                                          )
                 if check_mcnp:
                     current_run.run_mcnp()
                     current_run.move_mcnp_files()  # keep as separate step from run_mcnp()
                 current_run.process_rcty_keff()
-            current_run.process_rcty_rho()  # keep outside 'for' loop-- needs all keffs before calculating rho
-            current_run.process_rcty_coef()
-            current_run.plot_rcty_coef()
+            # current_run.process_rcty_rho()  # keep outside 'for' loop-- needs all keffs before calculating rho
+            # current_run.process_rcty_coef()
+            # current_run.plot_rcty_coef()
 
         elif run_type == 'void':
             if check_mcnp:
