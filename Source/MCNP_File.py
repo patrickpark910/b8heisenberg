@@ -28,8 +28,8 @@ class MCNP_File:
                  print_input=True,  # default: only defines self variables and does not print input template
                  core_number=49,  # default: reads fuel load positions from ./Source/Core/49.core
                  delete_extensions=['.s'],  # default: '.s'
-                 r_tank=62, # cm
-                 h_tank=TANK_HEIGHT, # cm
+                 r_tank=TANK_RADIUS, #  62   cm
+                 h_tank=TANK_HEIGHT, # 119.8 cm
                  n_rings=5,
                  chains_per_ring=[6,12,16,20,24],
                  ring_radii_list=None,

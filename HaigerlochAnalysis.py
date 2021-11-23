@@ -68,6 +68,8 @@ def ReedAutomatedNeutronicsEngine(argv):
             run_types = ['pack' if x == run_type else x for x in run_types]
         elif run_type.lower() in ['dens_fuel','urho','uraniumdensity']:
             run_types = ['dens_fuel' if x == run_type else x for x in run_types]
+        elif run_type.lower() in ['ra','radial']:
+            run_types = ['radial' if x == run_type else x for x in run_types]
         elif run_type.lower() in ['rm','modr','rcty_modr']:
             run_types = ['rcty_modr' if x == run_type else x for x in run_types]
         elif run_type.lower() in ['rp','pure','rcty_pure']:
@@ -139,6 +141,24 @@ def ReedAutomatedNeutronicsEngine(argv):
             current_run = BaseCase(run_type,
                                   tasks,
                                   core_number=core_number,
+                                  )
+            if check_mcnp:
+                current_run.run_mcnp()
+                current_run.move_mcnp_files(output_types_to_move=['.o'])  # keep as separate step from run_mcnp()
+            # current_run.process_rod_worth()
+
+
+        elif run_type == 'radial':
+            """ URANIUM DENSITY
+            """
+            current_run = BaseCase(run_type,
+                                  tasks,
+                                  core_number=core_number,
+                                  n_rings=6,
+                                  chains_per_ring=[6,12,16,20,24,30],
+                                  n_cubes_chain_a=9,
+                                  n_cubes_chain_b=8,
+                                  cube_interval=5.5,
                                   )
             if check_mcnp:
                 current_run.run_mcnp()

@@ -3,7 +3,8 @@ RUN_DESCRIPTIONS_DICT = {'base':'base case, original haigerloch core',
 						 'dens_fuel':'variation of fuel density',
 						 'axial_z':'vertical cube interval'}
 CUBE_LENGTH = round((5**3*1)**0.33333,4) # N% volume of 5cm
-TANK_HEIGHT = 119.8
+TANK_HEIGHT = 119.8 # 119.8
+TANK_RADIUS = 62 # 62
 FUEL_DENSITY = 18.5349 # g/cc
 CUBE_DIAGONAL = CUBE_LENGTH * np.sqrt(2)
 FUEL_DENSITIES = [18.00,18.05,18.10,18.15,18.20,18.25,18.30,18.35,18.40,18.45,18.50,18.55,18.60,18.65,18.70,18.75,18.80,18.85,18.90,18.95,19.00,19.05,19.10,19.15,19.20,19.25,19.30] #g/cc
