@@ -8,6 +8,7 @@ from BaseCase import *
 from Parameters import *
 from Utilities import *
 from ReactivityCoefficients import *
+from AxialGeometry import *
 from plotStyles import *
 
 """
@@ -63,12 +64,18 @@ def ReedAutomatedNeutronicsEngine(argv):
     for run_type in run_types:
         if run_type.lower() in ['b','base']:
             run_types = ['base' if x == run_type else x for x in run_types]
+        elif run_type.lower() in ['p','pack']:
+            run_types = ['pack' if x == run_type else x for x in run_types]
         elif run_type.lower() in ['dens_fuel','urho','uraniumdensity']:
             run_types = ['dens_fuel' if x == run_type else x for x in run_types]
         elif run_type.lower() in ['rm','modr','rcty_modr']:
             run_types = ['rcty_modr' if x == run_type else x for x in run_types]
         elif run_type.lower() in ['rp','pure','rcty_pure']:
             run_types = ['rcty_pure' if x == run_type else x for x in run_types]
+        elif run_type.lower() in ['az','axial_z']:
+            run_types = ['axial_z' if x == run_type else x for x in run_types]
+        elif run_type.lower() in ['aze','axial_z_ex']:
+            run_types = ['axial_z_ex' if x == run_type else x for x in run_types]
         else:
             print(f"\n  warning. run type '{run_type}' not recognized")
             run_types = [x for x in run_types if x != run_type]
@@ -207,6 +214,66 @@ def ReedAutomatedNeutronicsEngine(argv):
                         output_types_to_move=['.o', '.r', '.msht'])  # keep as separate step from run_mcnp()
                 current_run.process_flux_tallies()
 
+
+        elif run_type == 'axial_z_ex':
+            """ automatically squeeze in as many cubes per chain into the original height, or extend the tank height as minimum necessary 
+            """
+            for cube_interval in CUBE_INTERVALS_EXTD[::-1]:
+                packs = [15,14]
+                tank_height = TANK_HEIGHT
+                if (packs[0]*(CUBE_LENGTH*np.sqrt(2)+cube_interval)-cube_interval) > TANK_HEIGHT:
+                    tank_height = (packs[0]*(CUBE_LENGTH*np.sqrt(2)+cube_interval)-cube_interval)
+
+                current_run = AxialGeometry(run_type,
+                                            tasks,
+                                            core_number=core_number,
+                                            h_tank=tank_height,
+                                            n_cubes_chain_a=packs[0],
+                                            n_cubes_chain_b=packs[1],
+                                            cube_interval=cube_interval,)
+                if check_mcnp:
+                    print(f"\n\n================================================"
+                          f"\n Running run type '{run_type}' with properties:"\
+                          f"\n     tank height '{tank_height}'"\
+                          f"\n     cube interval '{cube_interval}'"\
+                          f"\n     cube chain lengths '{packs[0],packs[1]}'"\
+                          f"\n================================================\n\n")
+                    current_run.run_mcnp()
+                    current_run.move_mcnp_files(output_types_to_move=['.o'])  # keep as separate step from run_mcnp()
+                current_run.process_axial_keff()
+
+
+        elif run_type == 'pack':
+            """ automatically squeeze in as many cubes per chain into the original height, or extend the tank height as minimum necessary 
+            """
+            for packs in CUBE_PACKS:
+
+                tank_height = TANK_HEIGHT
+                if (packs[0]*CUBE_LENGTH*np.sqrt(2)) > TANK_HEIGHT:
+                    tank_height = packs[0]*CUBE_DIAGONAL
+
+                ci = str((tank_height-CUBE_DIAGONAL*packs[0])/(packs[0]-1))
+                cube_interval = float(ci[:ci.index('.')+3]) # TRUNCATES n-1=2 digits after . place -- DO NOT ROUND!!!
+
+                current_run = AxialGeometry(run_type,
+                                            tasks,
+                                            core_number=core_number,
+                                            h_tank=tank_height,
+                                            n_cubes_chain_a=packs[0],
+                                            n_cubes_chain_b=packs[1],
+                                            cube_interval=cube_interval,)
+                if check_mcnp:
+                    print(f"\n\n================================================"
+                          f"\n Running run type '{run_type}' with properties:"\
+                          f"\n     tank height '{tank_height}'"\
+                          f"\n     cube length '{CUBE_LENGTH}'"\
+                          f"\n     cube interval '{cube_interval}'"\
+                          f"\n     cube chain lengths '{packs[0],packs[1]}'"\
+                          f"\n================================================\n\n")
+                    current_run.run_mcnp()
+                    current_run.move_mcnp_files(output_types_to_move=['.o'])  # keep as separate step from run_mcnp()
+                current_run.process_axial_keff()
+
         elif run_type == 'plot':
             # plot the geometry and save plot figures
             if check_mcnp:
@@ -223,6 +290,21 @@ def ReedAutomatedNeutronicsEngine(argv):
                 sys.exit(2)
 
         elif run_type == 'powr':
+            pass
+
+        elif run_type == 'axial_z':
+            for cube_interval in CUBE_INTERVALS:
+                current_run = AxialGeometry(run_type,
+                                            tasks,
+                                            core_number=core_number,
+                                            cube_interval=cube_interval,)
+                if check_mcnp:
+                    print(" ")
+                    current_run.run_mcnp()
+                    current_run.move_mcnp_files(output_types_to_move=['.o'])  # keep as separate step from run_mcnp()
+                current_run.process_axial_keff()
+
+        elif run_type == 'axial_r':
             pass
 
         elif run_type == 'rcty_modr':

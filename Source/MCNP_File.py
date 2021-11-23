@@ -29,14 +29,13 @@ class MCNP_File:
                  core_number=49,  # default: reads fuel load positions from ./Source/Core/49.core
                  delete_extensions=['.s'],  # default: '.s'
                  r_tank=62, # cm
-                 h_tank=119.8, # cm
+                 h_tank=TANK_HEIGHT, # cm
                  n_rings=5,
                  chains_per_ring=[6,12,16,20,24],
                  ring_radii_list=None,
                  n_cubes_chain_a=9,
                  n_cubes_chain_b=8,
                  cube_interval=5.5,
-                 first_cube_offset=5.5,
                  h2o_temp_K = 294,  # used in: rcty, 294 K = 21 C = room temp = default temp in mcnp
                  h2o_density=None,  # used in: rcty, set None to calculate h2o_density from h2o_temp_K (recommended)
                  h2o_void_percent=0,  #
@@ -45,8 +44,8 @@ class MCNP_File:
                  d2o_void_percent=0,  #
                  d2o_purity=96.8,  # at% d2o
                  fuel_temp_K=294,  # used in: rcty
-                 fuel_density=19.05, # 19.05 g/cc nominal density
-                 grph_density=1.8, # 1.80 g/cc nominal density w air gapsg
+                 fuel_density=FUEL_DENSITY, # 19.05 g/cc nominal density
+                 grph_density=1.8, # 1.80 g/cc nominal density w air gaps
                  ):
 
         """
@@ -66,7 +65,10 @@ class MCNP_File:
         self.ring_radii_list = ring_radii_list
         self.cube_interval = cube_interval
         self.n_cubes_chain_a, self.n_cubes_chain_b = n_cubes_chain_a, n_cubes_chain_b
-        self.first_cube_offset = first_cube_offset
+        self.first_cube_offset = float('{:.2f}'.format((h_tank - (n_cubes_chain_a*CUBE_DIAGONAL+(n_cubes_chain_a-1)*cube_interval))/2))
+        if self.first_cube_offset < 0:
+            print(f" fatal. (MCNP_File.py) first cube offset = {self.first_cube_offset} < 0")
+            sys.exit()
 
         ''' Heavy and light water moderator properties '''
         self.h2o_temp_K = h2o_temp_K
@@ -127,6 +129,8 @@ class MCNP_File:
         self.write_setup()
         self.core_cells = self.write_core_cells()
         self.chain_a_surfaces, self.chain_b_surfaces = self.write_cube_surfaces()
+        self.chain_a_cells, self.chain_b_cells = self.write_chain_cells()
+        self.chain_a_cells_complements, self.chain_b_cells_complements = self.write_chain_cells_complements()
         self.core_fuel_cells_complements = self.write_cells_complements_str()
         self.ksrc_card = self.write_ksrc_card()
         # print(self.core_fuel_cells_complements)
@@ -146,6 +150,10 @@ class MCNP_File:
                            # 'chain_b_cube_cells_complements': self.chain_b_cube_cells_complements,
                            'chain_a_surfaces': self.chain_a_surfaces,
                            'chain_b_surfaces': self.chain_b_surfaces,
+                           'chain_a_cells': self.chain_a_cells,
+                           'chain_b_cells': self.chain_b_cells,
+                           'chain_a_cells_complements': self.chain_a_cells_complements,
+                           'chain_b_cells_complements': self.chain_b_cells_complements,
                            'tally': 'c ',
                            'mode': ' n ',
                            'grph_density': f'-{self.grph_density}', # -wt, +at
@@ -159,10 +167,10 @@ class MCNP_File:
                            'o_d2o_sab_lib': self.o_d2o_sab_lib,
                            'h2o_temp_MeV': '{:.6e}'.format(self.h2o_temp_K * MEV_PER_KELVIN),
                            'fuel_temp_MeV': '{:.6e}'.format(self.fuel_temp_K * MEV_PER_KELVIN),
-                           'fuel_density': f'-{self.fuel_density}', # nominal 19.05 g/cc
+                           'fuel_density': f'-{self.fuel_density}', # nominal 19.05 g/cc, PNNL test 18.5349 g/cc
                            # 'fuel_mats': self.fuel_mat_cards, # all cubes uniform
                            'ksrc_card': self.ksrc_card,
-                           'n_per_cycle': 100000, # 20k for testing, 100k for production
+                           'n_per_cycle': 60000, # 20k for testing, 100k for production
                            'discard_cycles': 15,
                            'kcode_cycles': 115,
                            }
@@ -183,6 +191,17 @@ class MCNP_File:
                                   f".i"
         elif self.run_type in ['dens_fuel']:
             self.input_filename = f"{self.base_filename}_{self.run_type}_{'{:.2f}'.format(self.fuel_density).replace('.','')}" \
+                                  f".i"
+        elif self.run_type in ['axial_z']:
+            self.input_filename = f"{self.base_filename}_{self.run_type}_{'{:.2f}'.format(self.cube_interval).replace('.','')}" \
+                                  f".i"
+        elif self.run_type in ['axial_z_ex']:
+            self.input_filename = f"{self.base_filename}_{self.run_type}"\
+                                  f"_{self.n_cubes_chain_a}_{self.n_cubes_chain_b}"\
+                                  f"_{'{:.2f}'.format(self.cube_interval).replace('.','')}" \
+                                  f".i"
+        elif self.run_type in ['pack']:
+            self.input_filename = f"{self.base_filename}_{self.run_type}_{self.n_cubes_chain_a}_{self.n_cubes_chain_b}" \
                                   f".i"
         elif self.run_type.startswith('rcty'):
             if 'modr' in self.run_type:
@@ -281,6 +300,27 @@ class MCNP_File:
 
     def write_cube_surfaces(self):
         cube_number = 0
+        chain_a_code = ''
+        self.chain_a_cubes_center_heights = []
+        while cube_number < self.n_cubes_chain_a:
+            cube_number += 1
+            cube_center_height = self.h_tank - (self.first_cube_offset + CUBE_DIAGONAL / 2) - (cube_number - 1) * \
+                                 (self.cube_interval + CUBE_DIAGONAL)
+            # cube_center_height = inner_tank_height - chain_interval * (cube_number - 1) - cube_diagonal / 2 * cube_number \
+            #                      - first_cube_offset
+            cube_top_height = cube_center_height + CUBE_DIAGONAL / 2
+            cube_bot_height = cube_center_height - CUBE_DIAGONAL / 2
+            new_code = f"c center at z = {round(cube_center_height, 6)}\n" \
+                       f"9{str(cube_number).zfill(2)}1 p  0   1  1  {round(cube_top_height, 6)}\n" \
+                       f"9{str(cube_number).zfill(2)}2 p  0  -1  1  {round(cube_top_height, 6)}\n" \
+                       f"9{str(cube_number).zfill(2)}3 p  0   1  1  {round(cube_bot_height, 6)}\n" \
+                       f"9{str(cube_number).zfill(2)}4 p  0  -1  1  {round(cube_bot_height, 6)}\n"
+            self.chain_a_cubes_center_heights.append(round(cube_center_height, 6))
+            chain_a_code = f"{chain_a_code}c\nc ------ Cube {cube_number} ------ \n{new_code}"
+        chain_a_code = chain_a_code + 'c\nc 9-cube chain center z coordinates\nc ' + str(
+            self.chain_a_cubes_center_heights)
+
+        cube_number = 0
         chain_b_code = ''
         self.chain_b_cubes_center_heights = []
         while cube_number < self.n_cubes_chain_b:
@@ -290,43 +330,57 @@ class MCNP_File:
                                  - (cube_number - 1) * (self.cube_interval + CUBE_DIAGONAL)
             # cube_center_height = inner_tank_height - chain_interval * (cube_number - 1) - cube_diagonal / 2 * cube_number \
             #                      - first_cube_offset - (chain_interval + cube_diagonal) / 2
-            cube_top_height = cube_center_height + 5 * np.sqrt(2) / 2
-            cube_bot_height = cube_center_height - 5 * np.sqrt(2) / 2
+            cube_top_height = cube_center_height + CUBE_DIAGONAL / 2
+            cube_bot_height = cube_center_height - CUBE_DIAGONAL / 2
             new_code = f"c center at z = {round(cube_center_height, 6)}\n" \
-                       f"8{cube_number}1 p  0   1  1  {round(cube_top_height, 6)}\n" \
-                       f"8{cube_number}2 p  0  -1  1  {round(cube_top_height, 6)}\n" \
-                       f"8{cube_number}3 p  0   1  1  {round(cube_bot_height, 6)}\n" \
-                       f"8{cube_number}4 p  0  -1  1  {round(cube_bot_height, 6)}\n"
+                       f"8{str(cube_number).zfill(2)}1 p  0   1  1  {round(cube_top_height, 6)}\n" \
+                       f"8{str(cube_number).zfill(2)}2 p  0  -1  1  {round(cube_top_height, 6)}\n" \
+                       f"8{str(cube_number).zfill(2)}3 p  0   1  1  {round(cube_bot_height, 6)}\n" \
+                       f"8{str(cube_number).zfill(2)}4 p  0  -1  1  {round(cube_bot_height, 6)}\n"
             self.chain_b_cubes_center_heights.append(round(cube_center_height, 6))
             chain_b_code = f"{chain_b_code}c\nc ------ Cube {cube_number} ------ \n{new_code}"
         chain_b_code = chain_b_code + 'c\nc 8-cube chain center z coordinates\nc ' + str(
             self.chain_b_cubes_center_heights)
 
-        cube_number = 0
+        return chain_a_code, chain_b_code
+
+    def write_chain_cells(self):
+        """ desired output example for chain a
+        900001 10001 -18.5349 -911 -912 +913 +914 -905 +906  imp:n=1 u=90 $ cube 1
+        900002 10001 -18.5349 -921 -922 +923 +924 -905 +906  imp:n=1 u=90 $ cube 2
+        """
         chain_a_code = ''
-        self.chain_a_cubes_center_heights = []
-        while cube_number < self.n_cubes_chain_a:
-            cube_number += 1
-            cube_center_height = self.h_tank - (self.first_cube_offset + CUBE_DIAGONAL / 2) - (cube_number - 1) * \
-                                 (self.cube_interval + CUBE_DIAGONAL)
-            # cube_center_height = inner_tank_height - chain_interval * (cube_number - 1) - cube_diagonal / 2 * cube_number \
-            #                      - first_cube_offset
-            cube_top_height = cube_center_height + 5 * np.sqrt(2) / 2
-            cube_bot_height = cube_center_height - 5 * np.sqrt(2) / 2
-            new_code = f"c center at z = {round(cube_center_height, 6)}\n" \
-                       f"9{cube_number}1 p  0   1  1  {round(cube_top_height, 6)}\n" \
-                       f"9{cube_number}2 p  0  -1  1  {round(cube_top_height, 6)}\n" \
-                       f"9{cube_number}3 p  0   1  1  {round(cube_bot_height, 6)}\n" \
-                       f"9{cube_number}4 p  0  -1  1  {round(cube_bot_height, 6)}\n"
-            self.chain_a_cubes_center_heights.append(round(cube_center_height, 6))
-            chain_a_code = f"{chain_a_code}c\nc ------ Cube {cube_number} ------ \n{new_code}"
-        chain_a_code = chain_a_code + 'c\nc 9-cube chain center z coordinates\nc ' + str(
-            self.chain_a_cubes_center_heights)
+        for n in np.arange(1,self.n_cubes_chain_a+1):
+            c = str(n).zfill(2)
+            chain_a_code += f"9000{c} 10001 -{self.fuel_density} -9{c}1 -9{c}2 +9{c}3 +9{c}4 -905 +906  imp:n=1 u=90 $ cube {n}"
+            if not n == self.n_cubes_chain_a:
+                chain_a_code += '\n'
 
-        return chain_b_code, chain_a_code # i fucked up so the chain_b_code is code for chain A, vice versa
+        chain_b_code = ''
+        for n in np.arange(1,self.n_cubes_chain_b+1):
+            c = str(n).zfill(2)
+            chain_b_code += f"8000{c} 10001 -{self.fuel_density} -8{c}1 -8{c}2 +8{c}3 +8{c}4 -805 +806  imp:n=1 u=80 $ cube {n}"
+            if not n == self.n_cubes_chain_b:
+                chain_b_code += '\n'
 
-    def write_core_fuel_cells(self):
-        pass
+        return chain_a_code, chain_b_code
+
+
+    def write_chain_cells_complements(self):
+        indent = "                   "
+        chain_a_code, chain_b_code = '', ''
+
+        for n in np.arange(1,self.n_cubes_chain_a+1):
+            chain_a_code += f"{indent}#9000{str(n).zfill(2)}"
+            if not n == self.n_cubes_chain_a:
+                chain_a_code += '\n'
+
+        for n in np.arange(1,self.n_cubes_chain_b+1):
+            chain_b_code += f"{indent}#8000{str(n).zfill(2)}"
+            if not n == self.n_cubes_chain_b:
+                chain_b_code += '\n'
+
+        return chain_a_code, chain_b_code
 
     def write_ksrc_card(self):
         ksrc_lines = "ksrc"
