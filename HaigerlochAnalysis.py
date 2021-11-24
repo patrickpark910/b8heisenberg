@@ -151,16 +151,32 @@ def ReedAutomatedNeutronicsEngine(argv):
         elif run_type == 'radial':
             """ URANIUM DENSITY
             """
+            tank_height = TANK_HEIGHT
+            tank_radius = TANK_RADIUS
+            cubes_a, cubes_b = 11,10
+
+            ci = str((tank_height-CUBE_DIAGONAL*cubes_a)/(cubes_a-1))
+            cube_interval = float(ci[:ci.index('.')+3]) # TRUNCATES n-1=2 digits after . place -- DO NOT ROUND!!!
+
             current_run = BaseCase(run_type,
                                   tasks,
                                   core_number=core_number,
+                                  h_tank=tank_height,
+                                  r_tank=tank_radius,
                                   n_rings=6,
                                   chains_per_ring=[6,12,16,20,24,30],
-                                  n_cubes_chain_a=9,
-                                  n_cubes_chain_b=8,
-                                  cube_interval=5.5,
+                                  n_cubes_chain_a=cubes_a,
+                                  n_cubes_chain_b=cubes_b,
+                                  cube_interval=cube_interval,
                                   )
             if check_mcnp:
+                print(f"\n\n================================================"
+                      f"\n Running run type '{run_type}' with properties:"\
+                      f"\n     tank h,r '{tank_height}', '{tank_radius}'"\
+                      f"\n     cube length '{CUBE_LENGTH}'"\
+                      f"\n     cube interval '{cube_interval}'"\
+                      f"\n     cube chain lengths '{cubes_a,cubes_b}'"\
+                      f"\n================================================\n\n")
                 current_run.run_mcnp()
                 current_run.move_mcnp_files(output_types_to_move=['.o'])  # keep as separate step from run_mcnp()
             # current_run.process_rod_worth()
