@@ -252,11 +252,13 @@ def ReedAutomatedNeutronicsEngine(argv):
 
 
         elif run_type == 'axial_z_ex':
-            """ automatically squeeze in as many cubes per chain into the original height, or extend the tank height as minimum necessary 
+            """ Squeeze in as many cubes per chain into the original height, else extend tank height and decrease cube interval as minimum necessary to do so
             """
             for cube_interval in CUBE_INTERVALS_EXTD[::-1]:
-                packs = [15,14]
+                packs = [11,10]
                 tank_height = TANK_HEIGHT
+                tank_radius = TANK_RADIUS
+
                 if (packs[0]*(CUBE_LENGTH*np.sqrt(2)+cube_interval)-cube_interval) > TANK_HEIGHT:
                     tank_height = (packs[0]*(CUBE_LENGTH*np.sqrt(2)+cube_interval)-cube_interval)
 

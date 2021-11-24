@@ -45,7 +45,7 @@ class MCNP_File:
                  d2o_purity=96.8,  # at% d2o
                  fuel_temp_K=294,  # used in: rcty
                  fuel_density=FUEL_DENSITY, # 19.05 g/cc nominal density
-                 grph_density=1.8, # 1.80 g/cc nominal density w air gaps
+                 grph_density=1.8, # 1.80 g/cc from Grasso 09 for natural graphite
                  ):
 
         """
@@ -144,6 +144,11 @@ class MCNP_File:
                            'core_number': self.core_number,
                            'r_tank' : self.r_tank,
                            'h_tank' : self.h_tank,
+                           'n_rings': self.n_rings,
+                           'chains_per_ring': self.chains_per_ring,
+                           'ring_radii_list': self.ring_radii_list,
+                           'n_cubes_chain_a': self.n_cubes_chain_a,
+                           'n_cubes_chain_b': self.n_cubes_chain_b,
                            'core_fuel_cells_complements': self.core_fuel_cells_complements,
                            'core_fuel_cells': self.core_cells,
                            # 'chain_a_cube_cells_complements': self.chain_a_cube_cells_complements,
