@@ -1,15 +1,9 @@
-import os
-import sys
-import shutil
-import argparse
-
-sys.path.insert(0, "./Source/")
-from BaseCase import *
+import os, sys, shutil, argparse
+sys.path.insert(0, "./Python/")
+from MCNP_Input import *
+from MCNP_Output import *
 from Parameters import *
 from Utilities import *
-from ReactivityCoefficients import *
-from Geometry import *
-from plotStyles import *
 
 def ReedAutomatedNeutronicsEngine(argv):
     print(" Type 'python3 HaigerlochAnalysis.py -h' for help.")
@@ -86,10 +80,14 @@ def ReedAutomatedNeutronicsEngine(argv):
         else:
             proceed = None
 
-    # -t
-    if isinstance(args_dict['t'], int) and int(args_dict['t']) <= cores:
-        pass
-    else:
+    # Argument parsing (-t) 
+    try:
+        if int(args_dict['t']) <= cores:
+            tasks = int(args_dict['t'])
+            print(f"  Running with {args_dict['t']} tasks.")
+        else: 
+            raise ValueError
+    except:
         print("\n No <tasks> specified, or invalid <tasks> in '-t <tasks>'.")
         tasks = get_tasks()  # Utilities.py
 
@@ -121,7 +119,6 @@ def ReedAutomatedNeutronicsEngine(argv):
         if run_type == 'R':
             """ BASE CASE
             """
-
             ci = str((TANK_HEIGHT-CUBE_DIAGONAL*CUBES_A_R)/(CUBES_A_R-1))
             cube_interval = float(ci[:ci.index('.')+3]) # TRUNCATES n-1=2 digits after . place -- DO NOT ROUND!!!
 
@@ -145,93 +142,43 @@ def ReedAutomatedNeutronicsEngine(argv):
             # current_run.process_rod_worth()
 
 
-        elif run_type == 'radial_ex':
-            """ URANIUM DENSITY
-            """
-            for r in RADIAL_INCREASE:
-                
-                tank_height = TANK_HEIGHT
-                tank_radius = TANK_RADIUS + r
-
-                ci = str((tank_height-CUBE_DIAGONAL*CUBES_A)/(CUBES_A-1))
-                cube_interval = float(ci[:ci.index('.')+3]) # TRUNCATES n-1=2 digits after . place -- DO NOT ROUND!!!
-
-                current_run = AxialGeometry(run_type,
-                                      tasks,
-                                      h_tank=tank_height,
-                                      r_tank=tank_radius,
-                                      n_rings=N_RINGS,
-                                      chains_per_ring=CHAINS_PER_RING,
-                                      n_cubes_chain_a=CUBES_A,
-                                      n_cubes_chain_b=CUBES_B,
-                                      cube_interval=cube_interval,
-                                      )
-                if check_mcnp:
-                    print(f"\n\n================================================"
-                          f"\n Running run type '{run_type}' with properties:"\
-                          f"\n     tank h,r '{tank_height}', '{tank_radius}'"\
-                          f"\n     rings '{N_RINGS}', '{CUBES_TOTAL}' cubes"\
-                          f"\n     cube length '{CUBE_LENGTH}'"\
-                          f"\n     cube interval '{cube_interval}'"\
-                          f"\n     cube chain lengths '{CUBES_A,CUBES_B}'"\
-                          f"\n================================================\n\n")
-                    current_run.run_mcnp()
-                    current_run.move_mcnp_files(output_types_to_move=['.o'])  # keep as separate step from run_mcnp()
-                current_run.process_axial_keff()
-
-        elif run_type == 'radial':
-            """ URANIUM DENSITY
-            """
-            tank_height = TANK_HEIGHT
-            tank_radius = TANK_RADIUS
-            cubes_a, cubes_b = 11,10
-
-            ci = str((tank_height-CUBE_DIAGONAL*cubes_a)/(cubes_a-1))
-            cube_interval = float(ci[:ci.index('.')+3]) # TRUNCATES n-1=2 digits after . place -- DO NOT ROUND!!!
-
-            current_run = BaseCase(run_type,
-                                  tasks,
-                                  h_tank=tank_height,
-                                  r_tank=tank_radius,
-                                  n_rings=6,
-                                  chains_per_ring=[6,12,16,20,24,30],
-                                  n_cubes_chain_a=cubes_a,
-                                  n_cubes_chain_b=cubes_b,
-                                  cube_interval=cube_interval,
-                                  )
-            if check_mcnp:
-                print(f"\n\n================================================"
-                      f"\n Running run type '{run_type}' with properties:"\
-                      f"\n     tank h,r '{tank_height}', '{tank_radius}'"\
-                      f"\n     cube length '{CUBE_LENGTH}'"\
-                      f"\n     cube interval '{cube_interval}'"\
-                      f"\n     cube chain lengths '{cubes_a,cubes_b}'"\
-                      f"\n================================================\n\n")
-                current_run.run_mcnp()
-                current_run.move_mcnp_files(output_types_to_move=['.o'])  # keep as separate step from run_mcnp()
-            current_run.process_axial_keff()
-
-
-        elif run_type == 'A':
-            """ URANIUM DENSITY
-            """
+        elif run_type == 'A': # Uranium Density
+            fails, failed_files, stop_stop_its_already_dead = 0, [], 1
             for fuel_density in FUEL_DENSITIES:
-                current_run = DensityFuel(run_type,
-                                          tasks,
-                                          print_input=check_mcnp,
-                                          fuel_density=fuel_density
-                                          )
-                if check_mcnp:
-                    current_run.run_mcnp()
+                if fails < stop_stop_its_already_dead:
+                    print(f"\n\n================================================" 
+                       f"\n  __B8Analysis.py"
+                       f"\n  | Processing run type '{run_type}' with properties:"
+                       f"\n  |   fuel cube density [g/cc] : {fuel_density} " 
+                       f"\n  |   all else reference core") # 
+                    #   f"\n================================================")
+                    current_run = Sensitivity(run_type,
+                                              tasks,
+                                              print_input=check_mcnp,
+                                              fuel_density=fuel_density)
+                    if check_mcnp:
+                        current_run.run_mcnp()
+                    else: 
+                        current_run.mcnp_skipped = True
                     current_run.move_mcnp_files(output_types_to_move=['.o'])  # keep as separate step from run_mcnp()
-                current_run.process_dens_fuel_keff()
+                    try:
+                        current_run.process_keff()
+                    except:
+                        print(f"\n  __B8Analysis.py"
+                           f"\n  | warning.  k-eff not found in {current_run.output_filepath}"\
+                           f"\n  | warning.  check if mcnp input was written correctly"\
+                           f"\n================================================\n\n")
+                        fails += 1
+                        failed_files.append(current_run.input_filename)
+
 
         elif run_type == 'B':
             """ MODERATOR PURITY
             """
             for d2o_purity in MODR_PURITIES:
-                current_run = Reactivity(run_type,
+                current_run = Sensitivity(run_type,
                                          tasks,
+                                         print_input=check_mcnp,
                                          d2o_purity=d2o_purity,
                                          )
                 if check_mcnp:
@@ -241,97 +188,6 @@ def ReedAutomatedNeutronicsEngine(argv):
             # current_run.process_rcty_rho()  # keep outside 'for' loop-- needs all keffs before calculating rho
             # current_run.process_rcty_coef()
             # current_run.plot_rcty_coef()
-
-        elif run_type == 'dens_grph':
-            """ URANIUM DENSITY
-            """
-            for grph_density in GRPH_DENSITIES:
-                current_run = Density(run_type,
-                                       tasks,
-                                       print_input=check_mcnp,
-                                       )
-                if check_mcnp:
-                    current_run.run_mcnp()
-                    current_run.move_mcnp_files(output_types_to_move=['.o'])  # keep as separate step from run_mcnp()
-                current_run.process_keff()
-
-        elif run_type == 'flux':
-            """ FLUXES - calculate fluxes at ir positions and control rods
-                uses kopts card in mcnp6, needs to be as close to keff=1 as possible for best results (MCNP6.2 manual 3-168)
-            """
-            for bank_height in BANK_HEIGHTS_FLUX + [ECP]:
-                current_run = Flux(run_type,
-                                   tasks,
-                                   rod_heights={'bank': bank_height, 'ecp': ECP}, )
-                if check_mcnp:
-                    current_run.run_mcnp()
-                    current_run.move_mcnp_files(
-                        output_types_to_move=['.o', '.r', '.msht'])  # keep as separate step from run_mcnp()
-                current_run.process_flux_tallies()
-
-
-        elif run_type == 'axial_ex':
-            """ Squeeze in as many cubes per chain into the original height, else extend tank height and decrease cube interval as minimum necessary to do so
-            """
-            for cube_interval in [4.2]: # CUBE_INTERVALS_EXTD[::-1]:
-                packs = [11,10]
-                tank_height = TANK_HEIGHT
-                tank_radius = 62 # TANK_RADIUS
-                chains_per_ring = [6,12,16,20,24,30]
-                n_rings = len(chains_per_ring)
-
-                if (packs[0]*(CUBE_LENGTH*np.sqrt(2)+cube_interval)-cube_interval) > TANK_HEIGHT:
-                    tank_height = (packs[0]*(CUBE_LENGTH*np.sqrt(2)+cube_interval)-cube_interval)
-
-                current_run = AxialGeometry(run_type,
-                                            tasks,
-                                            h_tank=tank_height,
-                                            r_tank=tank_radius,
-                                            n_rings=n_rings,
-                                            chains_per_ring=chains_per_ring,
-                                            n_cubes_chain_a=packs[0],
-                                            n_cubes_chain_b=packs[1],
-                                            cube_interval=cube_interval,)
-                if check_mcnp:
-                    print(f"\n\n================================================"
-                          f"\n Running run type '{run_type}' with properties:"\
-                          f"\n     tank height '{tank_height}'"\
-                          f"\n     cube interval '{cube_interval}'"\
-                          f"\n     cube chain lengths '{packs[0],packs[1]}'"\
-                          f"\n================================================\n\n")
-                    current_run.run_mcnp()
-                    current_run.move_mcnp_files(output_types_to_move=['.o'])  # keep as separate step from run_mcnp()
-                current_run.process_axial_keff()
-
-        elif run_type == 'axial_z_ex_6':
-            """ Squeeze in as many cubes per chain into the original height, else extend tank height and decrease cube interval as minimum necessary to do so
-            """
-            for cube_interval in CUBE_INTERVALS_EXTD[::-1]:
-                packs = [11,10]
-                tank_height = TANK_HEIGHT
-                tank_radius = TANK_RADIUS
-
-                if (packs[0]*(CUBE_LENGTH*np.sqrt(2)+cube_interval)-cube_interval) > TANK_HEIGHT:
-                    tank_height = (packs[0]*(CUBE_LENGTH*np.sqrt(2)+cube_interval)-cube_interval)
-
-                current_run = AxialGeometry(run_type,
-                                            tasks,
-                                            h_tank=tank_height,
-                                            n_rings=6,
-                                            n_cubes_chain_a=packs[0],
-                                            n_cubes_chain_b=packs[1],
-                                            chains_per_ring=[6,12,16,20,24,30],
-                                            cube_interval=cube_interval,)
-                if check_mcnp:
-                    print(f"\n\n================================================"
-                          f"\n Running run type '{run_type}' with properties:"\
-                          f"\n     tank height '{tank_height}'"\
-                          f"\n     cube interval '{cube_interval}'"\
-                          f"\n     cube chain lengths '{packs[0],packs[1]}'"\
-                          f"\n================================================\n\n")
-                    current_run.run_mcnp()
-                    current_run.move_mcnp_files(output_types_to_move=['.o'])  # keep as separate step from run_mcnp()
-                current_run.process_axial_keff()
 
         elif run_type == 'J':
             for tank_radius in TANK_RADII_J:
@@ -375,114 +231,6 @@ def ReedAutomatedNeutronicsEngine(argv):
                     current_run.process_keff()
 
 
-
-
-
-
-
-
-        elif run_type == 'pack':
-            """ automatically squeeze in as many cubes per chain into the original height, or extend the tank height as minimum necessary 
-            """
-            for packs in CUBE_PACKS:
-
-                tank_height = TANK_HEIGHT
-                if (packs[0]*CUBE_LENGTH*np.sqrt(2)) > TANK_HEIGHT:
-                    tank_height = packs[0]*CUBE_DIAGONAL
-
-                ci = str((tank_height-CUBE_DIAGONAL*packs[0])/(packs[0]-1))
-                cube_interval = float(ci[:ci.index('.')+3]) # TRUNCATES n-1=2 digits after . place -- DO NOT ROUND!!!
-
-                current_run = AxialGeometry(run_type,
-                                            tasks,
-                                            h_tank=tank_height,
-                                            n_cubes_chain_a=packs[0],
-                                            n_cubes_chain_b=packs[1],
-                                            cube_interval=cube_interval,)
-                if check_mcnp:
-                    print(f"\n\n================================================"
-                          f"\n Running run type '{run_type}' with properties:"\
-                          f"\n     tank height '{tank_height}'"\
-                          f"\n     cube length '{CUBE_LENGTH}'"\
-                          f"\n     cube interval '{cube_interval}'"\
-                          f"\n     cube chain lengths '{packs[0],packs[1]}'"\
-                          f"\n================================================\n\n")
-                    current_run.run_mcnp()
-                    current_run.move_mcnp_files(output_types_to_move=['.o'])  # keep as separate step from run_mcnp()
-                current_run.process_axial_keff()
-
-        elif run_type == 'plot':
-            # plot the geometry and save plot figures
-            if check_mcnp:
-                print(f' Running geometry plotter.')
-                current_run = MCNP_InputFile(run_type,
-                                             tasks,
-                                             template_filepath=None,
-                                             rod_heights={'safe': 0, 'shim': 0, 'reg': 0},  # defaults to all rods down
-                                             )
-                current_run.run_geometry_plotter()
-            else:
-                print('\n   fatal. no plotting is available without mcnp6')
-                sys.exit(2)
-
-        elif run_type == 'axial_z':
-            for cube_interval in CUBE_INTERVALS:
-                current_run = AxialGeometry(run_type,
-                                            tasks,
-                                            cube_interval=cube_interval,)
-                if check_mcnp:
-                    print(" ")
-                    current_run.run_mcnp()
-                    current_run.move_mcnp_files(output_types_to_move=['.o'])  # keep as separate step from run_mcnp()
-                current_run.process_axial_keff()
-
-        elif run_type == 'rcty_modr':
-            """ MODERATOR TEMPERATURE COEFFICIENT
-            """
-            for d2o_temp_C in D2O_MOD_TEMPS_C:
-                current_run = Reactivity(run_type,
-                                         tasks,
-                                         d2o_temp_K=float(d2o_temp_C + 273),
-                                         )
-                if check_mcnp:
-                    current_run.run_mcnp()
-                    current_run.move_mcnp_files(output_types_to_move=['.o'])  # keep as separate step from run_mcnp()
-                current_run.process_rcty_keff()
-            current_run.process_rcty_rho()  # keep outside 'for' loop-- needs all keffs before calculating rho
-            current_run.process_rcty_coef()
-            current_run.plot_rcty_coef()
-
-        elif run_type == 'rcty_fuel':
-            """ FUEL TEMPERATURE COEFFICIENT
-            """
-            for u235_temp_K in UZRH_FUEL_TEMPS_K:
-                current_run = Reactivity(run_type,
-                                         tasks,
-                                         template_filepath=None,
-                                         rod_heights={'bank': 100},  # ECP},
-                                         uzrh_temp_K=u235_temp_K,
-                                         )
-                if check_mcnp:
-                    current_run.run_mcnp()
-                    current_run.move_mcnp_files()  # keep as separate step from run_mcnp()
-                current_run.process_rcty_keff()
-            current_run.process_rcty_rho()  # keep outside 'for' loop-- needs all keffs before calculating rho
-            current_run.process_rcty_coef()
-            current_run.plot_rcty_coef()
-
-        elif run_type == 'void':
-            if check_mcnp:
-                current_run = MCNP_InputFile(run_type,
-                                             tasks,
-                                             template_filepath=None,
-                                             rod_heights=rod_heights_dict,
-                                             h2o_temp_K=h2o_temp_K,
-                                             h2o_density=h2o_density,
-                                             rcty_type=rcty_type,
-                                             ct_cell_mat=101,
-                                             ct_mat_density=0.001225  # g/cc
-                                             )
-                current_run.run_mcnp()
 
 
 if __name__ == "__main__":
