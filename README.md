@@ -84,6 +84,8 @@ This is an example of how to list things you need to use the software and how to
 
 ## B8 Fiducial - Flux
 
+### [MCNP Input File: `b8_caseR_rings5_d2o96-8_RaBe.inp`](/B8 Fiducial - Flux/b8_caseR_rings5_d2o96-8_RaBe.inp)
+
 The following `SDEF` card defines a Radon-Beryllium source. It is modeled as a point source, located at `(0, 0, 62)` of the MCNP model (center of the B8). It has a distribution of emitted neutron energies `d1` defined by the energy bins in MeV in `si1` and the probability of each bin in `sp1`, e.g., no neutrons < 0.316 MeV, 0.347% between 0.316 MeV to 0.398 MeV, etc. This data is from the [IAEA <i>Compendium of Neutron Spectra</i> (1990), p.79](inis.iaea.org/collection/NCLCollectionStore/_Public/21/092/21092101.pdf). 
 ```
 sdef  pos= 0 0 62  erg=d1  par=n
@@ -115,6 +117,8 @@ c kcode 200000 1 15 115
 
 
 ## B8 Fiducial - k_eff - Sensitivty Analyses
+
+
 
 
 
