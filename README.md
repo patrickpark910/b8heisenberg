@@ -185,27 +185,147 @@ python B8Analysis.py -r A -t 32
 
 
 
-### What the Wrapper Does
+### What the Wrapper Does: Front-End
 
-Now that we've executed run type `A`, in `B8Analysis.py` 
+**Step 1**
+
+Now that we've executed run type `A`, from `B8Analysis.py`, we then read the `FUEL_DENSITIES` we want to test from `Parameters.py`. 
 
 ```py
 elif run_type == 'A':
     for fuel_density in FUEL_DENSITIES:
+      current_run = Sensitivity(run_type,
+                                tasks,
+                                print_input=check_mcnp,
+                                fuel_density=fuel_density)
 ```
+
+This then populates the `Sensitivity` class in `MCNP_Output.py`:
+```py
+class Sensitivity(MCNP_File):
+```
+which has a `MCNP_File` class defined in `MCNP_Input.py`:
+```py
+class MCNP_File:
+    def __init__(self,run_type,tasks,
+               print_input=True, 
+               delete_extensions=['.s'],  # default: '.s'
+               r_tank=TANK_RADIUS, #  61.7 cm
+               h_tank=TANK_HEIGHT, # 124.0 cm
+               n_rings=5,
+               [...] )
+```
+
+**Step 2**
+
+`MCNP_Input.py` is where the bulk of the scripting occurs. In the `MCNP_File` class, we first define, calculate, etc. all of the necessary physical parameters. To do so, I also call several helper functions from `Utilities.py`. For example, we calculate the D2O density to program into the MCNP input, using the helper `d2o_temp_K_to_mass_density(d2o_temp_K)`:
+
+```py
+self.d2o_density = (1-0.01*self.d2o_void_percent)*d2o_temp_K_to_mass_density(d2o_temp_K)
+```
+
+where we set `d2o_temp_K` to the  B8's ambient 11 C (`AMBIENT_TEMP_K = 284` in `Parameters.py`).  
+
+**Step 3**
+
+Then, we use the physical constants to write code chunks in MCNP syntax. For instance, we need to call the necessary cross section libraries for particle transport in the moderator. Like described in the paper, we want to perform temperature interpolation. So in `MCNP_Input.py` we run the function `find_xs_libs()`:
+
+```py
+def find_xs_libs(self):
+  self.d2o_mats_interpolated_str = wtr_interpolate_mat(self.d2o_temp_K, d2o_atom_percent=self.d2o_purity)
+```
+
+which calls `wtr_interpolate_mat()` from `Utilities.py`:
+
+```py
+def wtr_interpolate_mat(temp_K, d2o_atom_percent=0):
+  [...]
+  return wtr_mats_interpolated
+```
+
+```py
+>>> wtr_interpolate_mat(294, d2o_atom_percent=100)
+"1002.00c  2.00  8016.00c 1.00"
+>>> wtr_interpolate_mat(294, d2o_atom_percent=50)
+"1001.00c  1.00      1002.00c  1.00      8016.00c 1.00"
+>>> wtr_interpolate_mat(284, d2o_atom_percent=96.8)
+"1001.06c 0.014100  1001.00c 0.049900    1002.06c 0.426529  1002.00c 1.509471    8016.00c 1.00"
+```
+
+**Step 4**
+
+We also create the names of our MCNP input and outputs so that its parameters are self-evident from the file name. To avoid any processing issues, we replace any decimals with an underscore `_`.
+
+```py
+self.base_filename = f"{self.template_filepath.split('/')[-1].split('.')[0]}-case{self.run_type}"
+if self.run_type in ['A','B']:
+            self.input_filename = f"{self.base_filename}-d2o{'{:.1f}'.format(self.d2o_purity).replace('.','_')}-Urho{'{:.2f}'.format(self.fuel_density).replace('.','_')}.inp"
+self.output_filename = f"o_{self.input_filename.split('.')[0]}.out"
+```
+
+Some examples of `self.input_filename` and `self.output_filename` are:
+```
+b8-caseA-d2o96_8-Urho15_00.inp
+b8-caseA-d2o96_8-Urho19_25.inp
+b8-caseB-d2o85_0-Urho18_53.inp
+b8-caseB-d2o100_0-Urho18_53.inp
+
+o_b8-caseA-d2o96_8-Urho15_00.out
+o_b8-caseA-d2o96_8-Urho19_25.out
+o_b8-caseB-d2o85_0-Urho18_53.out
+o_b8-caseB-d2o100_0-Urho18_53.out
+```
+
+We can read that case `A` keeps the moderator purity constant at the reference 96.8 mol% D2O while changing the fuel density, and vice versa for case `B`, just as God (yours truly) intended.
+
+**Step 5**
+
+Once we do that, we load everything into a dictionary `self.parameters`:
+```py
+self.parameters = {'datetime': self.datetime,
+                   'run_type': self.run_type,
+                   'r_tank' : self.r_tank,
+                   'h_tank' : self.h_tank,
+                   'n_rings': self.n_rings,
+                   [...]
+                   'h_h2o_sab_lib': self.h_h2o_sab_lib,
+                   'd_d2o_sab_lib': self.d_d2o_sab_lib,}
+```
+
+ it into the `b8.template` MCNP input template using the `Jinja2` package:
+
+```py
+if self.print_input:
+    with open(self.template_filepath, 'r') as template_file:
+        template_str = template_file.read()
+        template = Template(template_str)
+        template.stream(**self.parameters).dump(self.input_filepath)
+```
+
+
+**Step 6**
+
+Now that the MCNP input file is written, we then run MCNP:
+```py
+def run_mcnp(self):
+    if self.output_filename not in os.listdir(self.outputs_folder):
+        cmd = f"""mcnp6 i="{self.input_filepath}" n="{self.user_temp_folder}/{self.output_filename.split('.')[0]}." tasks {self.tasks}"""
+        os.system(cmd)
+        self.mcnp_skipped = False
+    else:
+        self.mcnp_skipped = True
+```
+
+Notice that MCNP is writing outputs to a temporary `./MCNP/<run_type>/temp/` folder. After MCNP finishes, we then move the outputs to `./MCNP/<run_type>/outputs/` folder with `move_mcnp_files()` in `MCNP_Input.py`.
+
+### What the Wrapper Does: Back-End
 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
 
-<!-- ROADMAP -->
-## Roadmap
 
-- [ ] Feature 1
-- [ ] Feature 2
-- [ ] Feature 3
-    - [ ] Nested Feature
 
 See the [open issues](https://github.com/github_username/repo_name/issues) for a full list of proposed features (and known issues).
 
