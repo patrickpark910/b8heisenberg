@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 
-def gen_ksrc_coords(r, n):
+def calc_hcp_coords(r, n):
     try:
         df = pd.read_csv('./Python/hcp_coords.csv') 
     except: 
@@ -28,8 +28,8 @@ def gen_ksrc_coords(r, n):
     # mags = 10 ** (p - 1 - np.floor(np.log10(outp)))
     # out = np.round(out * mags) / mags
     
-    print(f"  comment. Packing.py last element of out array: {out[-1]}")
-    np.savetxt('testing.txt', out[-1], delimiter=',',fmt='%1.6e')
+    # print(f"  comment. Packing.py last element of out array: {out[-1]}")
+    # np.savetxt('testing.txt', out[-1], delimiter=',',fmt='%1.6e')
     return out
 
 # # np.savetxt('test.txt', gen_ksrc_coords(61.1154577633,1400), delimiter=',',fmt='%1.6e')

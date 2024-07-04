@@ -109,23 +109,25 @@ def B8Cylinder(argv):
     for run_type in run_types:
         if print_desc:
             print(f"\n Currently calculating: {RUN_DESCRIPTIONS_DICT[run_type]}")
-
+        
+        print(f"")
         if run_type == 'SC':
             fails, failed_files, stop_stop_its_already_dead = 0, [], 1
             for n in reversed(SC_N_CUBES): # SD_N_CUBES:
                 for m in reversed(SC_MODR_VOLS):
                     if fails < stop_stop_its_already_dead:
+                        print(f"\n\n================================================" 
+                           f"\n  __B8Optimize.py"
+                           f"\n  | Processing run type '{run_type}' with properties:"\
+                           f"\n  |   core radius [cm] : {rd(((n*CUBE_LENGTH**3 + m)/2/np.pi)**(1/3),4)}"
+                           f"\n  |   n cubes          : {n}"
+                           f"\n  |   modr vol [L]     : {m/1e3} " ) # 
+                        #   f"\n================================================")
                         current_run = Cylinder(run_type,
                                                tasks,
                                                n_cubes  = n,            # nominal = 664
                                                modr_vol = m,)
                         if check_mcnp:
-                            print(f"\n\n================================================"
-                               f"\n Running run type '{run_type}' with properties:"\
-                               f"\n     core radius [cm] : {rd(current_run.r_core,4)}"\
-                               f"\n     n cubes          : {n}"\
-                               f"\n     modr vol [L]     : {m/1e3} "\
-                               f"\n================================================\n\n")
                             current_run.run_mcnp()
                         else: 
                             current_run.mcnp_skipped = True
@@ -133,24 +135,25 @@ def B8Cylinder(argv):
                         try:
                             current_run.process_keff()
                         except:
-                            print(f"\n\n================================================"
-                               f"\n  warning.  k-eff not found in {current_run.output_filepath}"\
-                               f"\n  warning.  check if mcnp input was written correctly"\
+                            print(f"\n  __B8Optimize.py"
+                               f"\n  | warning.  k-eff not found in {current_run.output_filepath}"\
+                               f"\n  | warning.  check if mcnp input was written correctly"\
                                f"\n================================================\n\n")
                             fails += 1
                             failed_files.append(current_run.input_filename)
                     else:
                         continue
             if fails > 0:
-                print(f"\n\n================================================\n")
+                print(f"\n\n================================================" 
+                      f"\n  __B8Optimize.py\n")
                 if fails == stop_stop_its_already_dead:
-                    print(f" fatal.    run auto-terminated because {fails} inputs failed to produce a k-eff")
-                    print(f" fatal.    max allowed fails set to {stop_stop_its_already_dead} in B8Optimize.py\n")
-                print(f"  warning.  errors in at least {fails} input files")
-                print(f"  warning.  check if these mcnp inputs were written correctly in:")
-                print(f"  warning.  {current_run.inputs_folder}/")
+                    print(f"  | fatal.    B8Optimize.py auto-terminated because {fails} inputs failed to produce a k-eff")
+                    print(f"  | fatal.    max allowed fails set to {stop_stop_its_already_dead}\n")
+                print(f"  | warning.  errors in at least {fails} input files")
+                print(f"  | warning.  check if these mcnp inputs were written correctly in:")
+                print(f"  | warning.  {current_run.inputs_folder}/")
                 for f in failed_files:
-                    print(f"  warning.    {f}")   
+                    print(f"  | warning.    {f}")   
                 print(f"\n================================================\n\n")
 
 

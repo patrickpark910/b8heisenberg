@@ -85,8 +85,7 @@ class MCNP_Input:
 
         """ Find data libraries
         """
-        self.find_xs_libs()
-        self.find_sab_libs()
+
 
 
         """ Define and create necessary directories
@@ -102,8 +101,29 @@ class MCNP_Input:
 
         """ Write code
         """
-        self.write_cards()
 
+
+
+        """
+        Define input file names and paths
+        """
+        self.base_filename = f"{self.template_filepath.split('/')[-1].split('.')[0]}-case{self.run_type}"
+        self.input_filename = f"{self.base_filename}-c{self.n_cubes}-r{'{:.2f}'.format(self.r_core).replace('.','_')}-d2o{'{:.1f}'.format(self.d2o_purity).replace('.','_')}-v{round(self.modr_vol/1e3)}.inp"
+
+        self.input_filepath = f"{self.temp_folder}/{self.input_filename}"
+        self.output_filename = f"o_{self.input_filename.split('.')[0]}.o"
+        self.output_filepath = f"{self.MCNP_folder}/outputs/{self.output_filename}"
+
+
+        """ Create input file by populating template with self.parameters dictionary
+        """
+
+    def write_input(self):
+        # if self.print_input:
+        print(f"\n  __MCNP_Input.py")
+        self.find_xs_libs()
+        self.find_sab_libs()
+        self.write_cards()
 
         """ Load variables into dictionary to be pasted into the template
         """
@@ -129,32 +149,12 @@ class MCNP_Input:
                            'o_d2o_sab_lib': self.o_d2o_sab_lib,
                            "ksrc_points"     : self.ksrc_points}
 
-
-        """
-        Define input file names and paths
-        """
-        self.base_filename = f"{self.template_filepath.split('/')[-1].split('.')[0]}-case{self.run_type}"
-        self.input_filename = f"{self.base_filename}-c{self.n_cubes}-r{'{:.2f}'.format(self.r_core).replace('.','_')}-d2o{'{:.1f}'.format(self.d2o_purity).replace('.','_')}-v{round(self.modr_vol/1e3)}.inp"
-
-        self.input_filepath = f"{self.temp_folder}/{self.input_filename}"
-        self.output_filename = f"o_{self.input_filename.split('.')[0]}.o"
-        self.output_filepath = f"{self.MCNP_folder}/outputs/{self.output_filename}"
-
-
-        """ Create input file by populating template with self.parameters dictionary
-        """
-        if self.print_input:
-            with open(self.template_filepath, 'r') as template_file:
-                template_str = template_file.read()
-                template = Template(template_str) # + '\n' + tally_str)
-                template.stream(**self.parameters).dump(self.input_filepath)
-                self.print_input = False
-                print(f"\n input file created at: {self.input_filepath}")
-
-
-
-
-
+        with open(self.template_filepath, 'r') as template_file:
+            template_str = template_file.read()
+            template = Template(template_str) # + '\n' + tally_str)
+            template.stream(**self.parameters).dump(self.input_filepath)
+            self.print_input = False
+            print(f"  | comment. input file created at: {self.input_filepath}")
 
 
 
@@ -167,11 +167,12 @@ class MCNP_Input:
         self.ksrc_points      = ''       # need 5 spaces after first line
         self.cube_universes   = ''
         
-
         try:
-            coords = gen_ksrc_coords(self.r_core-4.5,self.n_cubes)
+            coords = calc_hcp_coords(self.r_core-4.5,self.n_cubes)
         except:
-            print(f"  fatal. No hexagonal close packing coordinates for {self.n_cubes} cubes")
+            print(f"  | fatal. Packing.py could not calculate hcp coords for {self.n_cubes} cubes")
+            print(f"  | fatal. do not mess with Packing.py unless you understand the linear algebra")
+            print(f"  | fatal. check if {round(self.modr_vol)} L > volume of {self.n_cubes} cubes")
             sys.exit(2) # fyi for testing: if sys.exit() in try clause it will still go to except
 
         n = 0
@@ -222,9 +223,9 @@ class MCNP_Input:
                 try:
                     os.mkdir(path)
                 except:
-                    print(f"\n   warning. cannot make {path}")
-                    print(f"   warning. It is possible that the directories above the destination do not exist.")
-                    print(f"   warning. Python cannot create multiple directory levels in one command.")
+                    print(f"  | warning. cannot make {path}")
+                    print(f"  | warning. it is possible that the directories above the destination do not exist")
+                    print(f"  | warning. python cannot create multiple directory levels in one command")
 
 
     def find_xs_libs(self):
@@ -245,8 +246,8 @@ class MCNP_Input:
             except:
                 closest_temp_K = find_closest_value(self.fuel_temp_K, list(mat_list[i][1].keys()))
                 mat_list[i][0] = mat_list[i][1][closest_temp_K]
-                print(f"\n   comment. {mat_list[i][2]} cross-section (xs) data at {self.fuel_temp_K} K does not exist")
-                print(f"   comment.   using closest available xs data at temperature: {closest_temp_K} K")
+                print(f"  | comment. {mat_list[i][2]} cross-section (xs) data at {self.fuel_temp_K} K does not exist")
+                print(f"  | comment.   using closest available xs data at temperature: {closest_temp_K} K")
 
         self.u235_xs_lib, self.u238_xs_lib, = mat_list[0][0], mat_list[1][0],
         # self.pu239_xs_lib, self.sm149_xs_lib = mat_list[2][0], mat_list[3][0]
@@ -263,8 +264,8 @@ class MCNP_Input:
         except:
             closest_temp_K = find_closest_value(self.d2o_temp_K, list(O_TEMPS_K_XS_DICT.keys()))
             self.o_xs_lib = O_TEMPS_K_XS_DICT[closest_temp_K]
-            print(f"\n   comment. oxygen cross-section (xs) data at {self.d2o_temp_K} K does not exist")
-            print(f"   comment.   using closest available xs data at temperature: {closest_temp_K} K")
+            print(f"  | comment. oxygen cross-section (xs) data at {self.d2o_temp_K} K does not exist")
+            print(f"  | comment.   using closest available xs data at temperature: {closest_temp_K} K")
         
 
 
@@ -281,8 +282,8 @@ class MCNP_Input:
             except:
                 closest_temp_K = find_closest_value(sab_list[i][3], list(sab_list[i][1].keys()))
                 sab_list[i][0] = sab_list[i][1][closest_temp_K]
-                print(f"\n   comment. {sab_list[i][2]} scattering S(a,B) data at {sab_list[i][3]} does not exist")
-                print(f"   comment.   using closest available S(a,B) data at temperature: {closest_temp_K} K")
+                print(f"  | comment. {sab_list[i][2]} scattering S(a,B) data at {sab_list[i][3]} does not exist")
+                print(f"  | comment. using closest available S(a,B) data at temperature: {closest_temp_K} K")
         self.h_h2o_sab_lib, self.d_d2o_sab_lib, self.o_d2o_sab_lib = sab_list[0][0], sab_list[1][0], sab_list[2][0]
 
 
@@ -295,13 +296,15 @@ class MCNP_Input:
             try:
                 filename = self.input_filepath.split('/')[-1]
                 shutil.move(self.input_filepath, os.path.join(dst, self.input_filename))
-                print(f'\n   comment. moved {filename}')
-                print(f'   comment.   from {src} ')
-                print(f'   comment.   to   {dst}\n')
+                print(f"\n  __MCNP_Input.py"
+                      f'\n  | comment. moved {filename}'
+                      f'\n  | comment.   from {src} '
+                      f'\n  | comment.   to   {dst}\n')
             except:
-                print(f'   warning. error moving {filename}')
-                print(f'   warning.   from {src} ')
-                print(f'   warning.   to   {dst}')
+                print(f"\n  __MCNP_Input.py"
+                      f'\n  | warning. error moving {filename}'
+                      f'\n  | warning.   from {src} '
+                      f'\n  | warning.   to   {dst}')
 
         # move outputs
         output_file = f"{self.output_filename.split('.')[0]}"  # general output filename without extension
@@ -319,13 +322,15 @@ class MCNP_Input:
                 try:
                     filename = output_file + extension
                     shutil.move(os.path.join(src, filename), os.path.join(dst, filename))
-                    print(f'\n   comment. moved {filename}')
-                    print(f'   comment.   from {src} ')
-                    print(f'   comment.   to   {dst}\n')
+                    print(f"\n  __MCNP_Input.py"
+                          f'\n  | comment. moved {filename}'
+                          f'\n  | comment.   from {src} '
+                          f'\n  | comment.   to   {dst}\n')
                 except:
-                    print(f'   warning. error moving {filename}')
-                    print(f'   warning.   from {src} ')
-                    print(f'   warning.   to   {dst}')
+                    print(f"\n  __MCNP_Input.py"
+                          f'\n  | warning. error moving {filename}'
+                          f'\n  | warning.   from {src} '
+                          f'\n  | warning.   to   {dst}')
 
 
     def delete_mcnp_files(self, folder=None, extensions_to_delete=None):
@@ -345,49 +350,22 @@ class MCNP_Input:
                 try:
                     os.remove(file)
                 except:
-                    print(f"\n   comment. did not remove {f'{folder}/{file}'}")
-                    print(f"   comment.   because the filepath does not exist")
+                    print(f"\n  __MCNP_Input.py"
+                          f"\n  | comment. did not remove {f'{folder}/{file}'}"
+                          f"\n  | comment. because the filepath does not exist")
 
 
     def run_mcnp(self):
         """ Runs MCNP
         """
         if self.output_filename not in os.listdir(self.outputs_folder):
+            self.write_input()
             os.system(
                 f"""mcnp6 i="{self.input_filepath}" n="{self.temp_folder}/{self.output_filename.split('.')[0]}." tasks {self.tasks}""")
             self.mcnp_skipped = False
         else:
-            print(f'\n   comment. skipping this mcnp run since results for {self.input_filename} already exist.')
+            print(f"\n  __MCNP_Input.py"
+                  f'\n  | comment. skipping this mcnp run since results for {self.input_filename} already exist')
             self.mcnp_skipped = True
 
 
-    def extract_keff(self):
-        """ Parses output file for keff, 1sgima uncertainty, and thermal fission fraction.
-        """
-        if os.path.exists(self.results_folder):
-            try:
-                get_keff = False
-                get_therm_n_frac = False
-                found_keff = False
-
-                with open(self.output_filepath) as f:
-                    for line in f:
-                        # if found_keff:
-                        #     return
-                        # else:
-                        if len(line.split()) > 2 and line.split()[1]=='(<0.625':
-                            self.therm_n_frac = float(line.split()[3].replace('%',''))
-                            print(f' thermal neutron % = {self.therm_n_frac}')
-
-                        if line.startswith(" the estimated average keffs"):
-                            get_keff = True
-                        elif get_keff and line.startswith("       col/abs/trk len"):
-                            self.keff, self.keff_unc = float(line.split()[2]), float(line.split()[3])
-                            found_keff = True
-                            print(f' keff: {self.keff} +/- {self.keff_unc}')
-            except:
-                print(f"\n   warning. keff not found in {self.output_filepath}")
-                print(f"   warning.   skipping {self.output_filepath}")
-        else:
-            print(f'\n   fatal. cannot find {self.results_folder}\n')
-            sys.exit(2)

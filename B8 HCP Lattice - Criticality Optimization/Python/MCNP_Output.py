@@ -6,6 +6,34 @@ from Parameters import *
 
 class Cylinder(MCNP_Input):
 
+    def extract_keff(self):
+        """ Parses output file for keff, 1sgima uncertainty, and thermal fission fraction.
+        """
+        if os.path.exists(self.results_folder):
+            try:
+                get_keff = False
+                get_therm_n_frac = False
+                found_keff = False
+
+                with open(self.output_filepath) as f:
+                    for line in f:
+                        if len(line.split()) > 2 and line.split()[1]=='(<0.625':
+                            self.therm_n_frac = float(line.split()[3].replace('%',''))
+                            print(f'  | comment. found thermal neutron % = {self.therm_n_frac}')
+
+                        if line.startswith(" the estimated average keffs"):
+                            get_keff = True
+                        elif get_keff and line.startswith("       col/abs/trk len") and not found_keff:
+                            self.keff, self.keff_unc = float(line.split()[2]), float(line.split()[3])
+                            found_keff = True
+                            print(f'  | comment. found keff: {self.keff} +/- {self.keff_unc}')
+            except:
+                print(f"\n   warning. keff not found in {self.output_filepath}")
+                print(f"   warning.   skipping {self.output_filepath}")
+        else:
+            print(f'\n   fatal. cannot find {self.results_folder}\n')
+            sys.exit(2)
+
     def process_keff(self):
 
         self.keff_filename = f'{self.base_filename}-keff.csv'
@@ -27,6 +55,7 @@ class Cylinder(MCNP_Input):
         self.keff_filepath = f"{self.results_folder}/{self.keff_filename}"
         # need to make sure self.keff_filepath has latest keff_filename
         
+        print(f"\n  __MCNP_Output.py")
         self.extract_keff()
 
         if self.keff_filename in os.listdir(self.results_folder):
