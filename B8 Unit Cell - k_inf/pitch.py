@@ -27,7 +27,7 @@ def delaunayAdjacencyMatrix(nodes):
     n = len(nodes)
     d = Delaunay(nodes)
     adjTensor = torch.zeros(n,n,device=device)
-    for i in d.simplices:
+    for i in d.simplices: # iterating over simplices and annotating them as a complete graph in the adjacency matrix
         for j in range(len(i)-1):
             for k in range(j+1,len(i)):
                 adjTensor[i[j]][i[k]] = 1.0
@@ -37,9 +37,9 @@ def delaunayAdjacencyMatrix(nodes):
 def l2Matrix(nodes):
     """Computes a matrix of L2 norms with M[i][j] -> ||n_i - n_j||"""
     nodesTensor = to_device(torch.Tensor(nodes), device)
-    nodesL2 = nodesTensor.expand(len(nodes),len(nodes),len(nodes[0]))
-    nodesL2 = nodesL2 - nodesL2.transpose(0,1)
-    nodesL2 = torch.linalg.norm(nodesL2, dim=2)
+    nodesL2 = nodesTensor.expand(len(nodes),len(nodes),len(nodes[0])) # dublicates the coordinates row wise into a square tensor of coordinates
+    nodesL2 = nodesL2 - nodesL2.transpose(0,1) # M - M^T corresponds to the square tensor with vectors pointing from node i to node j
+    nodesL2 = torch.linalg.norm(nodesL2, dim=2) # Converting the tensor to a matrix by taking the norm of the last layer here
     return nodesL2
 
 
