@@ -3,12 +3,12 @@
 
 <!-- PROJECT LOGO -->
 <br />
-<h3 align="center">Nuclear Forensics of the B8: Heisenberg's Last Reactor</h3>
+<h2 align="center">Nuclear Forensics of the B8: Heisenberg's Last Reactor</h2>
 
   <p align="center">
     This repository has all the code and data in support of our paper.
     <br />
-    <a href="https://github.com/github_username/repo_name"><strong>Explore the docs »</strong></a>
+    <a href="https://github.com/patrickpark910/b8heisenberg/blob/v3/2024-07-01%20-%20B8_Analysis_INMM.pdf"><strong>Read the paper»</strong></a>
   </p>
 </div>
 
@@ -41,6 +41,10 @@
 </details>
 
 
+<!-- CONTACT -->
+## Contact
+Patrick J. Park - pjp2136@columbia.edu (permanent)
+Project Link: [https://github.com/patrickpark910/b8heisenberg](https://github.com/patrickpark910/b8heisenberg)
 
 <!-- ABOUT THE PROJECT -->
 ## About The Project
@@ -56,11 +60,7 @@ To get a local copy up and running follow these simple example steps.
 
 ### Prerequisites
 
-This is an example of how to list things you need to use the software and how to install them.
-* npm
-  ```sh
-  npm install npm@latest -g
-  ```
+
 
 ### Installation
 
@@ -163,7 +163,7 @@ I'll now try to walk through executing my code and what happens under the hood.
 ### Executing the Python Wrapper
 
 Ideally, executing this all is relatively simple (duh, that's the point of scripting everything, except for the 7,621 times it breaks!). In your terminal, `cd` to this directory and use:
-```
+```sh
 python B8Analysis.py -r <run_type> -t <tasks>
 ```
 
@@ -179,13 +179,13 @@ You have three options for `<run_type>` or 'cases':
 The `<tasks>` is the number of logical processors you have on your computer. You can leave the `-t` argument empty, and `B8Analysis.py` will check how many you have for you.
 
 Let's say we want to perturb the U cube density, so we use `run_type = A`, and I have 32 logical processors :
-```
+```sh
 python B8Analysis.py -r A -t 32
 ```
 
 
 
-### What the Wrapper Does: Front-End
+### What the Wrapper Does: MCNP Input Processing
 
 **Step 1**
 
@@ -283,7 +283,7 @@ self.output_filename = f"o_{self.input_filename.split('.')[0]}.out"
 ```
 
 Some examples of `self.input_filename` and `self.output_filename` are:
-```
+```sh
 b8-caseA-d2o96_8-Urho15_00.inp
 b8-caseA-d2o96_8-Urho19_25.inp
 b8-caseB-d2o85_0-Urho18_53.inp
@@ -327,8 +327,7 @@ Now that the MCNP input file is written, `B8Analysis.py` then checks if you have
 ```py
 elif run_type == 'A': # Uranium Density
     for fuel_density in FUEL_DENSITIES:
-        current_run = Sensitivity(run_type,
-                                  tasks,
+        current_run = Sensitivity(run_type, tasks,
                                   print_input=check_mcnp,
                                   fuel_density=fuel_density)
         if check_mcnp:
@@ -351,7 +350,7 @@ Notice that MCNP is writing outputs to a temporary `./MCNP/<run_type>/temp/` fol
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-### What the Wrapper Does: Back-End
+### What the Wrapper Does: MCNP Output Processing
 
 **Step 7**
 
@@ -391,6 +390,39 @@ Rinse and repeat Steps 1-8 until you ran and processed all the MCNP runs you wan
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
+## B8 HCP Lattice - Criticality Optimization
+
+This folder has the same structure as [./B8 Fiducial - k_eff - Sensitivity Analyses/](<./B8 Fiducial - k_eff - Sensitivity Analyses/>). I separated the two because writing the MCNP input for the HCP B8 required different template and calculations in MCNP_Input.py than the fiducial B8. *All code in this folder is fully standalone from ./B8 Fiducial - k_eff - Sensitivity Analyses/ and vice versa.*
+
+You execute this code identically as `B8Analysis.py`, except now it's called `B8Optimize.py` just so you can differentiate it. In your terminal, `cd` to this directory and use:
+```sh
+python B8Optimize.py -r <run_type> -t <tasks>
+```
+
+You have one option for `<run_type>` (I am a generous god):
+
+- `SC`: perturb moderator volume and number of cubes (set in Parameters.py)
+
+(`SC` is just a holdover designation from before I cleaned up all the other different cases I decided not to publish.)
+
+The `<tasks>` is the number of logical processors you have on your computer. You can leave the `-t` argument empty, and `B8Optimize.py` will check how many you have for you. I paid for 32 logical processors so I'm gonna use 32 logical processors:
+```sh
+python B8Optimize.py -r SC -t 32
+```
+
+Ride out the MCNP runs and collect the CSV of all the results in ./Result/SC/.
+
+To make my `contourf` plot, you don't need to touch anything, just execute B8ContourPlot.py:
+
+```sh
+python B8ContourPlot.py
+```
+
+## B8 Unit Cell - k_inf
+
+I drew the Unit Cell in my paper as a cylinder, but in the MCNP code it's actually a hexagonal prism (of equivalent Voronoi cross sectional area + volume). I just couldn't be bothered to draw a hexagon in SVG-Edit, which is the software I used to draw figures of the different B8 models. Same difference, though (honestly).
+
+
 
 
 
@@ -400,39 +432,16 @@ See the [open issues](https://github.com/github_username/repo_name/issues) for a
 
 
 
-<!-- CONTRIBUTING -->
-## Contributing
-
-Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
-
-If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open an issue with the tag "enhancement".
-Don't forget to give the project a star! Thanks again!
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-
 <!-- LICENSE -->
 ## License
 
-Distributed under the MIT License. See `LICENSE.txt` for more information.
+lmao what license
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
 
-<!-- CONTACT -->
-## Contact
 
-Your Name - [@twitter_handle](https://twitter.com/twitter_handle) - email@email_client.com
-
-Project Link: [https://github.com/github_username/repo_name](https://github.com/github_username/repo_name)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
