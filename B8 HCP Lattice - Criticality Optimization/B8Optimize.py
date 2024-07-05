@@ -127,11 +127,13 @@ def B8Cylinder(argv):
                                                tasks,
                                                n_cubes  = n,            # nominal = 664
                                                modr_vol = m,)
+
                         if check_mcnp:
                             current_run.run_mcnp()
+                            current_run.move_mcnp_files(output_types_to_move=['.o'])  # keep as separate step from run_mcnp()
                         else: 
-                            current_run.mcnp_skipped = True
-                        current_run.move_mcnp_files(output_types_to_move=['.o'])  # keep as separate step from run_mcnp()
+                            current_run.mcnp_skipped = True  
+                        
                         try:
                             current_run.process_keff()
                         except:

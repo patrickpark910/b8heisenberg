@@ -82,14 +82,7 @@ class MCNP_Input:
         # self.add_samarium = add_samarium # no samarium in haigerloch fuel cubes
         self.grph_density = grph_density
 
-
-        """ Find data libraries
-        """
-
-
-
-        """ Define and create necessary directories
-        """
+        # Define and create necessary directories
         self.template_filepath = INPUT_TEMPLATE_FILEPATH 
         self.MCNP_folder = f'./MCNP/{run_type}'
         self.results_folder = f'./Results/{run_type}'
@@ -97,11 +90,6 @@ class MCNP_Input:
         self.inputs_folder = f"{self.MCNP_folder}/inputs"
         self.outputs_folder = f"{self.MCNP_folder}/outputs"
         self.create_paths()
-
-
-        """ Write code
-        """
-
 
 
         """
@@ -120,13 +108,14 @@ class MCNP_Input:
 
     def write_input(self):
         # if self.print_input:
-        print(f"\n  __MCNP_Input.py")
+        # print(f"\n  __MCNP_Input.py")
+
+        # Find data libraries
         self.find_xs_libs()
         self.find_sab_libs()
         self.write_cards()
 
-        """ Load variables into dictionary to be pasted into the template
-        """
+        # Load variables into dictionary to be pasted into the template
         self.parameters = {"runtype"         : self.run_type,
                            "datetime"        : self.datetime,
                            "n_cubes"         : self.n_cubes,
@@ -354,18 +343,19 @@ class MCNP_Input:
                           f"\n  | comment. did not remove {f'{folder}/{file}'}"
                           f"\n  | comment. because the filepath does not exist")
 
-
     def run_mcnp(self):
         """ Runs MCNP
         """
+        print(f"\n  __MCNP_Input.py")
         if self.output_filename not in os.listdir(self.outputs_folder):
             self.write_input()
-            os.system(
-                f"""mcnp6 i="{self.input_filepath}" n="{self.temp_folder}/{self.output_filename.split('.')[0]}." tasks {self.tasks}""")
+            cmd = f"""mcnp6 i="{self.input_filepath}" n="{self.temp_folder}/{self.output_filename.split('.')[0]}." tasks {self.tasks}"""
+            print(f"  | comment. now running mcnp:\n\n{cmd}\n\n")
+            os.system(cmd)
             self.mcnp_skipped = False
         else:
-            print(f"\n  __MCNP_Input.py"
-                  f'\n  | comment. skipping this mcnp run since results for {self.input_filename} already exist')
+            print(f'  | comment. skipping this mcnp run for {self.input_filename}'
+                  f'\n  | comment.   since results already exist')
             self.mcnp_skipped = True
 
 

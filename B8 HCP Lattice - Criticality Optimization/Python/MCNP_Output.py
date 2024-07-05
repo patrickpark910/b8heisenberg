@@ -37,10 +37,9 @@ class Cylinder(MCNP_Input):
     def process_keff(self):
 
         self.keff_filename = f'{self.base_filename}-keff.csv'
+        self.keff_filepath = f"{self.results_folder}/{self.keff_filename}"
 
         if self.run_type in ['SC']:
-            self.keff_filename = f'{self.base_filename}-keff.csv'
-            self.keff_filepath = f"{self.results_folder}/{self.keff_filename}"
             self.index_var = self.output_filename
             self.index_header = "output_filename"
             self.index_data = []
@@ -50,10 +49,6 @@ class Cylinder(MCNP_Input):
                     r = (V/2/np.pi)**(1/3) 
                     # use append not += concactenation
                     self.index_data.append(f"o_{self.base_filename}-c{n}-r{'{:.2f}'.format(r).replace('.','_')}-d2o{'{:.1f}'.format(self.d2o_purity).replace('.','_')}-v{round(m/1e3)}.o")
-
-
-        self.keff_filepath = f"{self.results_folder}/{self.keff_filename}"
-        # need to make sure self.keff_filepath has latest keff_filename
         
         print(f"\n  __MCNP_Output.py")
         self.extract_keff()
