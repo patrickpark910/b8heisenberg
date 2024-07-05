@@ -224,7 +224,7 @@ class MCNP_File:
 self.d2o_density = (1-0.01*self.d2o_void_percent)*d2o_temp_K_to_mass_density(d2o_temp_K)
 ```
 
-where we set `d2o_temp_K` to the  B8's ambient 11 C (`AMBIENT_TEMP_K = 284` in `Parameters.py`).  
+where we set `d2o_temp_K` to the B8's ambient 11 C (`AMBIENT_TEMP_K = 284` in `Parameters.py`).  
 
 **Step 3**
 
@@ -243,14 +243,33 @@ def wtr_interpolate_mat(temp_K, d2o_atom_percent=0):
   return wtr_mats_interpolated
 ```
 
+For a given temperature in Kelvin `temp_K`, this function performs pseudomaterial interpolation for a water mixture of D2O and H2O. Mathematically, this interpolation is represented as the following. For desired temperature $T$ bracketed by two xs libraries of temperatures $T_L < T < T_H$, the fraction of atoms associated with the lower temperature is:
+
+```math
+f_L = \frac{\sqrt{T_H}-\sqrt{T}}{\sqrt{T_H}-\sqrt{T_L}},
+```
+
+and the fraction of the higher-temperature library is $f_H = 1 - f_L$ such that the total cross section $\Sigma$ of the nuclide is evaluated as:
+
+```math
+\Sigma(T) = f_L \cdot \Sigma(T_L) + f_H \cdot \Sigma(T_H).
+```
+
+Let's run `wtr_interpolate_mat()` by itself (just execute `Utilities.py` itself) to see how $f_L$ and $f_H$ get calculated:
 ```py
 >>> wtr_interpolate_mat(294, d2o_atom_percent=100)
-"1002.00c  2.00  8016.00c 1.00"
+"1002.00c 2.00    8016.00c 1.00"
 >>> wtr_interpolate_mat(294, d2o_atom_percent=50)
-"1001.00c  1.00      1002.00c  1.00      8016.00c 1.00"
+"1001.00c 1.00    1002.00c 1.00    8016.00c 1.00"
 >>> wtr_interpolate_mat(284, d2o_atom_percent=96.8)
-"1001.06c 0.014100  1001.00c 0.049900    1002.06c 0.426529  1002.00c 1.509471    8016.00c 1.00"
+"1001.06c 0.0141  1001.00c 0.0499    1002.06c 0.426529  1002.00c 1.509471  8016.00c 1.00"
 ```
+
+In the first case of 100% D2O at 294 K (21 C), we can see that isotopes `1002` (D) and `8016` (O) have xs library `.00c` exactly at 294 K. So we get 2 deuterons at 294 K (`1002.00c 2.00`) and 1 oxygen atom at 294 K (`8016.00c 1.00`), i.e., D2O. 
+
+In the second case of 50% D2O (and the other 50% H2O), we have 1/2 H2O + 1/2 D2O = 1 H (`1001`) + 1 D (`1002`) + 1 O (`8016`). 
+
+The third case of 96.8% D2O + 3.2% H2O at 284 K (11 C) is the card we need for the fiducial B8. Each isotope is split proportionally between the two closest xs libraries (`.00c` at 294 K and `.06c` at 250 K).
 
 **Step 4**
 
@@ -292,7 +311,7 @@ self.parameters = {'datetime': self.datetime,
                    'd_d2o_sab_lib': self.d_d2o_sab_lib,}
 ```
 
- it into the `b8.template` MCNP input template using the `Jinja2` package:
+it into the `b8.template` MCNP input template using the `Jinja2` package:
 
 ```py
 if self.print_input:
@@ -302,10 +321,22 @@ if self.print_input:
         template.stream(**self.parameters).dump(self.input_filepath)
 ```
 
-
 **Step 6**
 
-Now that the MCNP input file is written, we then run MCNP:
+Now that the MCNP input file is written, `B8Analysis.py` then checks if you have mcnp (`check_mcnp` boolean) and if so, calls the function to run MCNP:
+```py
+elif run_type == 'A': # Uranium Density
+    for fuel_density in FUEL_DENSITIES:
+        current_run = Sensitivity(run_type,
+                                  tasks,
+                                  print_input=check_mcnp,
+                                  fuel_density=fuel_density)
+        if check_mcnp:
+            current_run.run_mcnp()
+```
+
+where `run_mcnp()` is in `MCNP_Input.py`:
+
 ```py
 def run_mcnp(self):
     if self.output_filename not in os.listdir(self.outputs_folder):
@@ -318,8 +349,44 @@ def run_mcnp(self):
 
 Notice that MCNP is writing outputs to a temporary `./MCNP/<run_type>/temp/` folder. After MCNP finishes, we then move the outputs to `./MCNP/<run_type>/outputs/` folder with `move_mcnp_files()` in `MCNP_Input.py`.
 
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
 ### What the Wrapper Does: Back-End
 
+**Step 7**
+
+Once the MCNP run is completed, `B8Analysis.py` then moves the MCNP output file from the `/temp/` folder to the `/outputs/` folder. (This `/temp/` folder gets deleted and created again by `MCNP_Input.py` before the next MCNP input is run, so we just move the desired `.o` file out and the rest of the outputs we don't need gets trashed.)
+```py
+current_run.move_mcnp_files(output_types_to_move=['.o'])
+current_run.process_keff()
+```
+
+**Step 8**
+
+In `process_keff()`, located `MCNP_Output.py`, we then process the MCNP output file. It first sets up a CSV to collate all our results. It then calls `extract_keff()`, also in `MCNP_Output.py`, to read the output file to look for the calculated $k_\text{eff}$, its $\pm 1 \sigma$ uncertainty, and the thermal neutron fraction in the model. 
+
+```py
+def process_keff(self): # paraphrased for README.md
+
+    self.keff_filename = f'{self.base_filename}-keff.csv'
+    self.keff_filepath = f"{self.results_folder}/{self.keff_filename}"
+
+    if self.run_type in ['A']:
+        self.index_var, self.index_header, self.index_data = self.fuel_density, 'fuel density (g/cc)', FUEL_DENSITIES
+    elif self.run_type in ['B']:
+        self.index_var, self.index_header, self.index_data = self.d2o_purity, 'modr purity (mol%)', MODR_PURITIES
+
+    print(f"\n  __MCNP_Output.py")
+    self.extract_keff()
+
+    df_keff.loc[self.index_var, "keff"] = self.keff
+    df_keff.loc[self.index_var, "keff unc"] = self.keff_unc
+    df_keff.loc[self.index_var, "therm n %"] = self.therm_n_frac
+
+    df_keff.to_csv(self.keff_filepath, encoding='utf8')
+```
+
+Rinse and repeat Steps 1-8 until you ran and processed all the MCNP runs you want!
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
