@@ -24,10 +24,10 @@ Z = griddata((c, m), k, (X, Y), method='cubic')
 
 # Plot with filled contours, contour lines, and labels at each 0.01 increment
 z_min, z_max = np.nanmin(Z), np.nanmax(Z)
+FONTSIZE = 15
 
-plt.rc('font', family='Arial', size=12)
-
-plt.figure(figsize=(10, 8))
+plt.rc('font', family='Arial', size=FONTSIZE)
+plt.figure(figsize=(16, 8))
 
 original_cmap = plt.get_cmap('coolwarm')
 truncated_cmap = truncate_colormap(original_cmap, minval=0.275, maxval=1.0).with_extremes(under="#8db0fe")
@@ -36,17 +36,24 @@ truncated_cmap = truncate_colormap(original_cmap, minval=0.275, maxval=1.0).with
 levels = np.linspace(.9, 1.02, num=13) # [.91,.92,.93,0.94,0.95,.96,.97,.98,.99,1.00,1.01]
 contour_filled = plt.contourf(X, Y, Z, levels=levels, cmap=truncated_cmap, extend="min")
 contour_lines = plt.contour(X, Y, Z, levels=levels, colors='black', linewidths=0.5)
-plt.colorbar(contour_filled, label='Effective multiplication [k-eff]')
-plt.clabel(contour_lines, inline=True, fontsize=11, fmt='%1.2f')
+cbar = plt.colorbar(contour_filled,)
 
-plt.scatter(c, m)
+# plt.grid(which='minor', linestyle='-', linewidth=0.5, color='black',alpha=0.33)
+# plt.grid(which='major', linestyle='-', linewidth=0.5, color='black',alpha=0.5)
 
-plt.xticks(np.arange(500, 1500, step=100)) 
+plt.clabel(contour_lines, inline=True, fontsize=FONTSIZE, fmt='%1.2f')
+cbar.set_label('Effective multiplication [k-eff]', fontsize=FONTSIZE)
+
+# plt.scatter(c, m)
+plt.minorticks_on()
+plt.xticks(np.arange(500, 2300, step=200)) 
 plt.yticks(np.arange(1200, 4200, step=400)) 
 
-plt.xlabel('Number of cubes', family='Arial', fontsize=12)
-plt.ylabel('Moderator volume [L]', family='Arial', fontsize=12)
-# plt.title('')
+
+plt.xlabel('Number of nU cubes', family='Arial', fontsize=FONTSIZE)
+plt.ylabel('96.8%-pure heavy water volume [L]', family='Arial', fontsize=FONTSIZE)
+
+plt.savefig('high_res_plot_nogrid.png', dpi=500, bbox_inches='tight', pad_inches=0)
 plt.show()
 
 
