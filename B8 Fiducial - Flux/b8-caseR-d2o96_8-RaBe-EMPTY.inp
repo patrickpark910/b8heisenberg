@@ -1,0 +1,197 @@
+B8 Reactor Core (1945) 
+c
+c Patrick Park
+c
+c CORE EVACUATED TO MEASURE HEISENBERG'S REPRODUCTION FACTOR Z = 6.7
+c
+c __________________
+c Default MCNP units
+c
+c Length: cm
+c Mass: g
+c Energy & Temp.: MeV
+c Positive density (+x): atoms/barn-cm
+c Negative density (-x): g/cm3
+c Time: shakes
+c (1 barn = 10e-24 cm2, 1 sh = 10e-8 sec)
+c
+c
+c __________
+c Parameters
+c 
+c tank height  : 124
+c tank radius  : 61.7
+c n rings      : 5
+c ring radii   : [10.872589, 21.745178, 32.617767, 43.490356, 54.362945]
+c chains/ring  : [6, 12, 16, 20, 24]
+c cubes/chain  : 9, 8
+c cube interval: 5.5
+c 
+c d2o purity   : 96.8
+c 
+c densities g/cc
+c cube : -18.5349
+c grph : 
+c h2o  : -0.999438
+c d2o  : -1.106104
+c
+c 
+c -- BEGIN CELLS --
+c
+c Core exterior
+1    0  +46:-18:+19 imp:n=0 $ void
+1000 10200 -0.999438 (+45:-15:+17) -46 +18 -19 imp:n=1 $ light water
+c
+c Inner fuel tank
+1100 10700 -0.001205 +10 -11 -42 imp:n=1 $ empty tank
+c
+c                inner         outer cylinder surfaces
+1101 10400 -1.81 (+42:-10) -43 +12 -16 imp:n=1 $ Mg inner shell
+1102 10400 -1.81 +11 -42 -13 imp:n=1 $ Mg floor of grph lid
+c
+1103 10602 -1.70 (+43:-12) +12 -44 -17 imp:n=1  $ graphite jacket sides
+1104 10302 -2.71 (+44:-14) +15 -45 -17 imp:n=1 $ Al outer shell
+c
+1105 10602 -1.58  +13 -42 -16 imp:n=1 $ grph lid above Mg shell
+1106 10602 -1.58  +16 -43 -17 imp:n=1 $ grph top above lid
+1107 10602 -1.58  +14 -44 -12 imp:n=1 $ grph bottom
+c
+c
+
+c -- BEGIN SURFACES --
+c
+c
+c
+10  pz  0    $ bottom plane of fuel assembly
+11  pz  124  $ top plane of fuel assembly = graphite lid floor, bottom lip
+13  pz  125  $ graphite lid floor, top lip
+16  pz  163.7  $ inner Mg shell top
+17  pz  170.29999999999998 $ outer tank lid top
+19  pz  230.29999999999998 $ upper universe water
+c
+12  pz -0.3    $ inner tank bot thickness
+14  pz -45.3   $ outer tank bot
+15  pz -45.699999999999996   $ outer tank bot thickness
+18  pz -105.69999999999999 $ lower universe water
+c
+c 20  py
+c
+c 30  px
+c
+c
+4   cz 4.401
+40  cz  4.4  $ cyclinder of fuel universe fill - must be at least 5*sqrt(3)/2 = 4..33
+41  cz  0.2  $ r Al string
+42  cz  61.7   $ r inside of Mg shell
+43  cz  62.0   $ r outside of Mg shell
+44  cz  105.0    $ r inside of Al shell
+45  cz  105.4  $ r outside of Al shell
+46  cz  165.4 $ radial universe water
+c
+c 50  cy
+c
+c 60  cx
+c
+c
+c
+
+c -- BEGIN OPTIONS --
+c _____________
+c NB 2021-03-08:
+c Use '..' for commented decimals to avoid accidental find-and-replace
+c Use Los Alamos ACE charts for ENDF7 S(Î±,Î²) scattering cross section library codes (LA-UR-13-21822)
+c
+c NB 2021-09-15:
+c Upgraded to ENDF8 libraries (LA-UR-20-30460)
+c
+c
+c ------ Light Water (H2O) ------
+c Used for outer void
+c Assumed to be 66..67 at% Oxygen, 33..33 at% Hydrogen
+c
+m10200   1001.06c 0.440629      1001.00c 1.559371      8016.00c 1.00
+mt10200  h-h2o.41t  $ thermal scattering at  - no o-h2o SaB lib for MCNP6.2/ENDF8
+c
+c
+c ------ 5025 Aluminum -----
+c 6061-T6 Aluminum alloy used in the core structure (Grid plates, reflector cladding, etc.)
+c Density 2..68
+c From Grasso et al. 09
+m10301  13027.00c -0.9525 $ Al
+        12026.00c -0.0390 $ Mg
+        14028.00c -0.0025 $ Si
+        26056.00c -0.0020 $ Fe
+        30064.00c -0.0020 $ Zn
+        24050.00c -0.0015 $ Cr
+        29063.00c -0.0004 $ Cu
+        25055.00c -0.0001 $ Mn
+mt10301  al-27.40t    fe-56.40t  $ 294 K
+c
+c ------- 1100F Aluminum -------
+c   1100F Aluminum used in the cladding of graphite elements or old aluminum fuel elements
+c   Assumed to be 99.6% aluminum, 0.95% iron, 0.95% silicon, 0.125% copper, 0.05% manganese
+m10302  13027.00c 0.996   26054.00c 0.0056
+        26056.00c 0.0871  14028.00c 0.0871
+        14029.00c 0.004   14030.00c 0.003
+        29063.00c 0.0086  29065.00c 0.0039
+        25055.00c 0.0005
+mt10302  al-27.40t    fe-56.40t  $ 294 K
+c
+c
+c ------ Magnesium alloy (AZ91) -----
+c From Grasso et al. 09
+m10400  13027.00c -0.0800 $ Al
+        12026.00c -0.9020 $ Mg
+        14028.00c -0.0050 $ Si
+        30064.00c -0.0100 $ Zn
+        29063.00c -0.0010 $ Cu
+        25055.00c -0.0013 $ Mn
+        28058.00c -0.0007 $ Ni
+mt10400  al27.22t
+c
+c
+c ------- Siemens Electro-Graphite (C) Hanle -------
+c  Graphite used as the material for the reflector blank as well as the fuel element upper and lower spacers
+c  Density 1..7 or 1..58 g/cc due to air gaps (Pesic 18)
+c  At fracs from Hanle 41
+c  +at frac -mass frac
+m10602    6012.00c 9.892930e-01
+          6013.00c 1.069992e-02
+          5010.00c 1.392990e-06
+          5011.00c 5.606960e-06
+         48110.00c 1.248991e-08
+         48111.00c 1.279991e-08
+         48112.00c 2.412983e-08
+         48113.00c 1.221991e-08
+         48114.00c 2.872980e-08
+         48116.00c 7.489947e-09 
+mt10602 grph30.40t $ 30% porosity S(a,B) from 1.7/2.26=0.75=~25% porosity
+c
+c
+c
+c ------ Air (0.001205 g/cc) -------
+c From Sandia
+m10700  6000.80c  -0.000124 
+        7014.00c  -0.755268 
+        8016.00c  -0.231781 
+       18000.59c  -0.012827 $ Ar
+c
+c
+c RaBe source pg79: inis.iaea.org/collection/NCLCollectionStore/
+c     _Public/21/092/21092101.pdf  
+sdef  pos= 0 0 62  erg=d1  par=n
+si1  0.316   0.398   0.501   0.631   0.794   1.00    1.26
+     1.58    2.00    2.51    3.16    3.98    5.01    6.31
+     7.94   10.0    12.6 
+sp1     0    3.47e-3 2.66e-3 1.65e-3 2.03e-3 1.06e-2 2.75e-2 
+     5.19e-2 6.55e-2 7.31e-2 9.95e-2 1.64e-1 1.78e-1 1.21e-1
+     1.41e-1 5.71e-2 1.39e-3 
+c
+fc4 n flux in lwtr
+f4:n 1000
+e4 1e-6 20
+c
+c
+nps 1e8
+mode n
+c
