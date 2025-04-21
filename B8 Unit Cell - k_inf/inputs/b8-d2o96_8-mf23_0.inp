@@ -1,0 +1,79 @@
+B8 Reactor Core (1945) - Run Type:  - Printed: 2023-04-19 14:14:56
+c
+c Patrick Park
+c __________
+c Parameters
+c 
+c cell radius:  8.947002289
+c cube length:  5
+c 
+c densities g/cc
+c cube: -18.5349
+c grph: 
+c h2o : -0.999438
+c d2o : -1.106104
+c d2o pure: 96.8
+c 
+c -- BEGIN CELLS --
+1         0      +10 imp:n=0
+4 10001 -18.5349 -21 +22 -23 -24 +25 +26 imp:n=1 vol=125 $ cube
+5 10201 -1.10610 -10 #4 imp:n=1 vol=2875 $ hwtr
+c
+
+c -- BEGIN SURFACES --
+c spherical unit cell
+*10 so 8.947002289
+c cube center at origin
+21 px  2.5
+22 px -2.5
+23 p  0  1  1  3.535534 $  5sqrt(2)/2
+24 p  0 -1  1  3.535534 $  5sqrt(2)/2
+25 p  0  1  1 -3.535534 $ -5sqrt(2)/2
+26 p  0 -1  1 -3.535534 $ -5sqrt(2)/2
+c
+
+c -- BEGIN OPTIONS --
+c
+fc4 neutrons per fission
+f4:n 4
+fm4 -1.0 10001 -6 -7
+e0 0.625e-6 20
+c
+fc14 absorption fuel
+f14:n 4
+fm14 -1.0 10001 -2:-6 $  
+c
+fc24 absorption modr
+f24:n 5
+fm24 -1.0 10201 -2 $ 
+c
+c ------ B8 Uranium from Degussa Plant -----
+c Used in fuel cubes
+c Density 18..53 g/cc from PNNL
+c Uranium atom fracs from Sandia Nat Lab "MatMCNP code" SAND2014-17693
+c Equivalent boron 7.0 ppm by mass in cube per Pesic 18. I did the stoichiometry to convert them to atom fractions.
+m10001    92235.80c -0.007252385
+          92238.80c -0.992593935
+           5010.80c -1.393e-06 
+           5011.80c -5.607e-06
+c MCNP6.2 does not support S(a,b) for fissionable material
+c
+c ------ Heavy Water (D2O, 96..8at%) ------
+c Used in inner tank
+c Determined to be 96..8at% heavy, 3..2 at% light water by E.R. Smith, NBS, 1948
+c Density by interpolating NIST formulae for heavy and light water densities 1..1045
+m10201    1001.06c 0.014100  1001.00c 0.049900    1002.06c 0.426529  1002.00c 1.509471    8016.00c 1.00
+mt10201  d-d2o.41t o-d2o.41t h-h2o.41t $ thermal scattering at 
+c
+c
+c nps 1e+6
+mode n
+ksrc 0 0 0
+kcode 200000 1 15 115
+kopts blocksize=10 kinetics=yes precursor=yes
+c
+c fmesh4:n  GEOM= xyz    ORIGIN= -106 -106 -30
+c           IMESH= 212     IINTS= 424
+c           JMESH= 212     JINTS= 424
+c           KMESH= 224     KINTS= 448
+c
