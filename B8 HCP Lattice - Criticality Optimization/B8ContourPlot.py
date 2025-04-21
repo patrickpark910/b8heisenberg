@@ -16,10 +16,10 @@ data = pd.read_csv('./Results/SC/b8hcp-caseSC-keff.csv')
 c, m, k = data['cubes'], data['modr v L'], data['keff']
 
 # Create a grid to interpolate the data
-xi = np.linspace(c.min(), c.max(), 100)
-yi = np.linspace(m.min(), m.max(), 100)
+xi = np.linspace(c.min(), c.max(), 1000)
+yi = np.linspace(m.min(), m.max(), 1000)
 X, Y = np.meshgrid(xi, yi)
-Z = griddata((c, m), k, (X, Y), method='cubic')
+Z = griddata((c, m), round(k,3), (X, Y), method='cubic') # nearest, cubic
 
 
 # Plot with filled contours, contour lines, and labels at each 0.01 increment
@@ -44,7 +44,7 @@ plt.grid(which='major', linestyle='-', linewidth=0.5, color='black',alpha=0.5)
 plt.clabel(contour_lines, inline=True, fontsize=FONTSIZE, fmt='%1.2f')
 cbar.set_label('Effective multiplication [k-eff]', fontsize=FONTSIZE)
 
-# plt.scatter(c, m)
+plt.scatter(c, m) # turns on the dots
 plt.minorticks_on()
 plt.xticks(np.arange(500, 2300, step=200)) 
 plt.yticks(np.arange(1200, 4200, step=400)) 
@@ -53,8 +53,8 @@ plt.yticks(np.arange(1200, 4200, step=400))
 plt.xlabel('Number of nU cubes', family='Arial', fontsize=FONTSIZE)
 plt.ylabel('96.8%-pure heavy water volume [L]', family='Arial', fontsize=FONTSIZE)
 
-plt.savefig('b8-contour-highres.svg', dpi=500, bbox_inches='tight', pad_inches=0)
-plt.savefig('b8-contour-highres.png', dpi=500, bbox_inches='tight', pad_inches=0)
+# plt.savefig('b8-contour-highres.svg', dpi=500, bbox_inches='tight', pad_inches=0)
+# plt.savefig('b8-contour-highres.png', dpi=500, bbox_inches='tight', pad_inches=0)
 plt.show()
 
 
