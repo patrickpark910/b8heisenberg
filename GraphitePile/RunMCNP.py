@@ -11,7 +11,7 @@ def main():
         print(f"Error: '{target}' is not a directory", file=sys.stderr)
         sys.exit(1)
 
-    for entry in os.listdir(target):
+    for entry in reversed(os.listdir(target)):
         path = os.path.join(target, entry)
 
         if not os.path.isfile(path):
