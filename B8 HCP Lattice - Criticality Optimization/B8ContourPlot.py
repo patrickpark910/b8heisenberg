@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from scipy.interpolate import griddata
@@ -20,7 +21,7 @@ def main():
     X, Y = np.meshgrid(xi, yi)
 
     # Interpolant. Use linear to avoid ringing (which you can get in cubic)
-    Z_lin = griddata((c, m), k, (X, Y), method='linear') # linear, cubic
+    Z_lin = griddata((c, m), k, (X, Y), method='cubic') # linear, cubic
 
     # Smooth with Gaussian filter
     Z = gaussian_filter_nan(Z_lin, sigma=3) # sigma: Gaussian blur strength in grid cells; use 1.5-3 for gentle smoothing
@@ -39,7 +40,10 @@ def main():
     fig, ax = plt.subplots(figsize=(16, 10))
 
     original_cmap = plt.get_cmap('coolwarm')
-    truncated_cmap = truncate_colormap(original_cmap, minval=0.275, maxval=1.0).with_extremes(under="#8db0fe")
+    truncated_cmap = truncate_colormap(original_cmap, minval=0.275, maxval=1.0)
+    truncated_cmap.set_under("#8db0fe")
+    print(f"Matplotlib version: {matplotlib.__version__}")  # 👈 inline version print
+
 
     contour_filled = ax.contourf(X, Y, Z, levels=LEVELS, cmap=truncated_cmap, extend="min")
     contour_lines  = ax.contour(X, Y, Z, levels=LEVELS, colors='black', linewidths=0.5)
