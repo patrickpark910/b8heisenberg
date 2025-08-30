@@ -21,10 +21,10 @@ def main():
     X, Y = np.meshgrid(xi, yi)
 
     # Interpolant. Use linear to avoid ringing (which you can get in cubic)
-    Z_lin = griddata((c, m), k, (X, Y), method='cubic') # linear, cubic
+    Z_lin = griddata((c, m), k, (X, Y), method='linear') # linear, cubic
 
-    # Smooth with Gaussian filter
-    Z = gaussian_filter_nan(Z_lin, sigma=3) # sigma: Gaussian blur strength in grid cells; use 1.5-3 for gentle smoothing
+    # Smooth with Gaussian filter   
+    Z = gaussian_filter_nan(Z_lin, sigma=9) # sigma: Gaussian blur strength in grid cells; use 1.5-3 for gentle smoothing
 
 
 
@@ -37,24 +37,23 @@ def main():
 
     # Plot
     plt.rc('font', family='Arial', size=FONTSIZE)
-    fig, ax = plt.subplots(figsize=(16, 10))
+    fig, ax = plt.subplots(figsize=(16, 9))
 
     original_cmap = plt.get_cmap('coolwarm')
     truncated_cmap = truncate_colormap(original_cmap, minval=0.275, maxval=1.0)
     truncated_cmap.set_under("#8db0fe")
-    print(f"Matplotlib version: {matplotlib.__version__}")  # 👈 inline version print
 
-
+    k_1_contour    = ax.contour(X, Y, Z, levels=[1.00], colors='black', linewidths=0,)
     contour_filled = ax.contourf(X, Y, Z, levels=LEVELS, cmap=truncated_cmap, extend="min")
     contour_lines  = ax.contour(X, Y, Z, levels=LEVELS, colors='black', linewidths=0.5)
 
 
     # Increase space between the main axes (incl. right y-axis) and the colorbar
-    cbar = fig.colorbar(contour_filled, ax=ax, pad=0.12, fraction=0.035) 
+    cbar = fig.colorbar(contour_filled, ax=ax, pad=0.10, fraction=0.035) 
     ax.clabel(contour_lines, inline=True, fontsize=FONTSIZE, fmt='%1.2f')
 
     ax.grid(which='major', linestyle='-', linewidth=0.5, color='black', alpha=0.5)
-    ax.scatter(c, m, s=12, color='k', alpha=0.35, zorder=3)  # keep points, but deemphasize
+    # ax.scatter(c, m, s=12, color='k', alpha=0.15, zorder=3)  # keep points, but deemphasize
 
     # Primary axes
     ax.set_xlabel(r'Number of uranium cubes', fontsize=FONTSIZE)
@@ -80,20 +79,32 @@ def main():
     secax_x.set_xlabel(r'Uranium mass [kg] (18.53 g/cm$^3$)', fontsize=FONTSIZE)
 
 
+    """ Optimal V_M / V_F line """
     # Dotted line for optimal V_M/V_F ratio = V_D2O / V_U = 18.6
     x_line = np.linspace(c.min(), c.max(), 500)
     y_line = 18.6 * CUBE_VOL_L * x_line
     ax.plot(x_line, y_line, linestyle=':', linewidth=2, color='k')
 
-    # Optional label in axes coordinates
-    #ax.text(0.02, 0.96, r'$V_{\mathrm{D_2O}}/V_{\mathrm{U}} = 18.6$',
-    #        transform=ax.transAxes, ha='left', va='top', fontsize=FONTSIZE-2,
-    #        bbox=dict(facecolor='white', alpha=0.6, edgecolor='none', pad=2))
+    # Compute slope and rotation angle
+    slope = (y_line[-1] - y_line[0]) / (x_line[-1] - x_line[0]) 
+    angle = np.degrees(np.arctan(slope)) - 26.75
+
+    # Place label lower on the line (x*100% up from start)
+    pos_idx = int(len(x_line) * 0.3)
+
+    ax.text(
+        x_line[pos_idx]-30, y_line[pos_idx]+30,
+        r"Optimal V$_M$ $/$ V$_F$ = 18.6",
+        rotation=angle,
+        ha='center', va='center',
+        fontsize=FONTSIZE, color='black',
+        bbox=dict(boxstyle="square,pad=0.2", facecolor='white', edgecolor='none', alpha=0.7)
+    )
+
 
     """
     Extract k-eff = 1.00 contour 
     """
-    k_1_contour = ax.contour(X, Y, Z, levels=[1.00], colors='red', linewidths=2, alpha=0.8)
 
     # Extract the path vertices of the k-eff = 1.00 contour line
     path = k_1_contour.get_paths()[0]
@@ -110,52 +121,54 @@ def main():
     min_y_point = (x_contour[min_y_idx], y_contour[min_y_idx])
     
     # Add label for the Pareto-optimal contour
-    # Find a good position along the contour (e.g., at about 30% along the curve)
-    label_idx = int(len(x_contour) * 0.3)
+    # Find a good position along the contour (at x*100% along the curve)
+    label_idx = int(len(x_contour) * 0.15)
     ax.annotate('Pareto-optimal contour\nof k-eff = 1.00 solutions', 
                 xy=(x_contour[label_idx], y_contour[label_idx]),
-                xytext=(x_contour[label_idx] + 150, y_contour[label_idx] + 300),
-                fontsize=13, fontweight='bold', color='darkred',
+                xytext=(x_contour[label_idx] - 350, y_contour[label_idx] + 200),
+                fontsize=FONTSIZE, color='black',
                 arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0.3', 
-                               color='darkred', lw=1.5),
-                bbox=dict(boxstyle="round,pad=0.3", facecolor='white', 
-                         edgecolor='darkred', alpha=0.8))
+                               color='black', lw=1),
+                bbox=dict(boxstyle="square,pad=0.3", facecolor='white', 
+                         edgecolor='black', alpha=0.8))
     
     # Add dot and label for minimum x point
-    ax.plot(min_x_point[0], min_x_point[1], 'o', color='blue', markersize=10, zorder=5)
+    ax.plot(min_x_point[0], min_x_point[1], 'o', color='black', markersize=6, zorder=5)
     ax.annotate(f'Minimum cubes\n({min_x_point[0]:.0f} cubes, {min_x_point[1]:.0f} L)', 
                 xy=min_x_point,
-                xytext=(min_x_point[0] - 200, min_x_point[1] - 400),
-                fontsize=12, fontweight='bold', color='blue',
+                xytext=(min_x_point[0] - 325, min_x_point[1] - 300),
+                fontsize=FONTSIZE, color='black',
                 arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=-0.3', 
-                               color='blue', lw=1.5),
-                bbox=dict(boxstyle="round,pad=0.3", facecolor='white', 
-                         edgecolor='blue', alpha=0.8))
+                               color='black', lw=1),
+                bbox=dict(boxstyle="square,pad=0.3", facecolor='white', 
+                         edgecolor='black', alpha=0.8))
     
     # Add dot and label for minimum y point
-    ax.plot(min_y_point[0], min_y_point[1], 'o', color='green', markersize=10, zorder=5)
-    ax.annotate(f'Minimum D₂O\n({min_y_point[0]:.0f} cubes, {min_y_point[1]:.0f} L)', 
+    ax.plot(min_y_point[0], min_y_point[1], 'o', color='black', markersize=6, zorder=5)
+    ax.annotate(f'Minimum D$_2$O\n({min_y_point[0]:.0f} cubes, {min_y_point[1]:.0f} L)', 
                 xy=min_y_point,
-                xytext=(min_y_point[0] + 200, min_y_point[1] - 300),
-                fontsize=12, fontweight='bold', color='green',
+                xytext=(min_y_point[0] + 50, min_y_point[1] - 250),
+                fontsize=FONTSIZE, color='black',
                 arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0.3', 
-                               color='green', lw=1.5),
-                bbox=dict(boxstyle="round,pad=0.3", facecolor='white', 
-                         edgecolor='green', alpha=0.8))
+                               color='black', lw=1),
+                bbox=dict(boxstyle="square,pad=0.3", facecolor='white', 
+                         edgecolor='black', alpha=0.8))
 
     # Add fiducial B8 point at 664 cubes and 1400 liters
     fiducial_point = (664, 1400)
-    ax.plot(fiducial_point[0], fiducial_point[1], 'o', color='purple', markersize=10, zorder=5)
+    ax.plot(fiducial_point[0], fiducial_point[1], 'o', color='black', markersize=6, zorder=5)
     ax.annotate('Fiducial B8\n(664 cubes, 1400 L)', 
                 xy=fiducial_point,
-                xytext=(fiducial_point[0] - 250, fiducial_point[1] + 300),
-                fontsize=12, fontweight='bold', color='purple',
+                xytext=(fiducial_point[0] + 200, fiducial_point[1] + 50),
+                fontsize=FONTSIZE, color='black',
                 arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=-0.3', 
-                               color='purple', lw=1.5),
-                bbox=dict(boxstyle="round,pad=0.3", facecolor='white', 
-                         edgecolor='purple', alpha=0.8))
+                               color='black', lw=1),
+                bbox=dict(boxstyle="square,pad=0.3", facecolor='white', 
+                         edgecolor='black', alpha=0.8))
 
     fig.tight_layout()
+    # plt.savefig("./Figure/contour.png", dpi=600, bbox_inches="tight", pad_inches=0.01)
+    # plt.savefig("./Figure/contour.pdf", bbox_inches="tight", pad_inches=0.01)
     plt.show()
 
 
