@@ -145,7 +145,9 @@ To improve the accuracy of our $Z$, we tally the outgoing neutron current at fin
 
 ## B8 Fiducial - k_eff - Sensitivty Analyses
 
-This folder contains ALL the code I used to generate this sensitivity analysis for perturbations in heavy water purity and uranium density:  ![Sensitivity Plot](https://github.com/patrickpark910/b8pile/blob/v3/B8%20Fiducial%20-%20k_eff%20-%20Sensitivity%20Analyses/Figures/sensitivity.png)
+This folder contains ALL the code I used to generate this sensitivity analysis for perturbations in heavy water purity and uranium density: 
+
+![Sensitivity Plot](https://github.com/patrickpark910/b8pile/blob/v3/B8%20Fiducial%20-%20k_eff%20-%20Sensitivity%20Analyses/Figures/sensitivity.png)
 
 This is where understanding my code gets a little tricky, because I wrote a huge Python wrapper to automate writing + processing MCNP for me. I don't think anyone will really use my code anyways, but I'll write it out just as due diligence.
 
@@ -389,7 +391,9 @@ Rinse and repeat Steps 1-8 until you ran and processed all the MCNP runs you wan
 
 ## B8 HCP Lattice - Criticality Optimization
 
-This folder contains ALL the code I used to generate this beautiful contour plot:  ![Contour Plot](https://github.com/patrickpark910/b8pile/blob/v3/B8%20HCP%20Lattice%20-%20Criticality%20Optimization/Figure/contour_extra_labels.png)
+This folder contains ALL the code I used to generate this beautiful contour plot:  
+
+![Contour Plot](https://github.com/patrickpark910/b8pile/blob/v3/B8%20HCP%20Lattice%20-%20Criticality%20Optimization/Figure/contour_extra_labels.png)
 
 This folder has the same structure as [./B8 Fiducial - k_eff - Sensitivity Analyses/](<./B8 Fiducial - k_eff - Sensitivity Analyses/>). I separated the two because writing the MCNP input for the HCP B8 required different template and calculations in MCNP_Input.py than the fiducial B8. *All code in this folder is fully standalone from ./B8 Fiducial - k_eff - Sensitivity Analyses/ and vice versa.*
 
