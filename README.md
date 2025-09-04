@@ -1,8 +1,5 @@
-<!-- Improved compatibility of back to top link: See: https://github.com/othneildrew/Best-README-Template/pull/73 -->
-<a id="readme-top"></a>
 
-<!-- PROJECT LOGO -->
-<br />
+
 <h2 align="center">Nuclear Forensics of the B8: Heisenberg's Last Reactor</h2>
 
   <p align="center">
@@ -10,75 +7,11 @@
     <br />
     <a href="https://github.com/patrickpark910/b8heisenberg/blob/v3/2024-07-01%20-%20B8_Analysis_INMM.pdf"><strong>Read the paper»</strong></a>
   </p>
-</div>
 
-
-
-<!-- TABLE OF CONTENTS -->
-<details>
-  <summary>Table of Contents</summary>
-  <ol>
-    <li>
-      <a href="#about-the-project">About The Project</a>
-      <ul>
-        <li><a href="#built-with">Built With</a></li>
-      </ul>
-    </li>
-    <li>
-      <a href="#getting-started">Getting Started</a>
-      <ul>
-        <li><a href="#prerequisites">Prerequisites</a></li>
-        <li><a href="#installation">Installation</a></li>
-      </ul>
-    </li>
-    <li><a href="#usage">Usage</a></li>
-    <li><a href="#roadmap">Roadmap</a></li>
-    <li><a href="#contributing">Contributing</a></li>
-    <li><a href="#license">License</a></li>
-    <li><a href="#contact">Contact</a></li>
-    <li><a href="#acknowledgments">Acknowledgments</a></li>
-  </ol>
-</details>
-
-
-<!-- CONTACT -->
 ## Contact
 Patrick J. Park - pjp2136@columbia.edu (permanent)
-Project Link: [https://github.com/patrickpark910/b8heisenberg](https://github.com/patrickpark910/b8heisenberg)
+Project Link: [https://github.com/patrickpark910/b8pile](https://github.com/patrickpark910/b8pile)
 
-<!-- ABOUT THE PROJECT -->
-## About The Project
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-<!-- GETTING STARTED -->
-## Getting Started
-
-This is an example of how you may give instructions on setting up your project locally.
-To get a local copy up and running follow these simple example steps.
-
-### Prerequisites
-
-
-
-### Installation
-
-1. Get a free API Key at [https://example.com](https://example.com)
-2. Clone the repo
-   ```sh
-   git clone https://github.com/github_username/repo_name.git
-   ```
-3. Install NPM packages
-   ```sh
-   npm install
-   ```
-4. Enter your API in `config.js`
-   ```js
-   const API_KEY = 'ENTER YOUR API';
-   ```
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
 # Code & Data Processing Walkthrough
@@ -87,10 +20,31 @@ In this section, I'll describe what my (often Python-scripted) MCNP inputs do an
 
 ## B8 Fiducial - Flux
 
-### MCNP Input File: 
-[`b8_caseR_rings5_d2o96-8_RaBe.inp`](</B8 Fiducial - Flux/b8_caseR_rings5_d2o96-8_RaBe.inp>)
+The objective of the MCNP files in this folder is to calculate Heisenberg's *Vermehrungsfaktor* $Z$.
 
-The following `SDEF` card defines a Radon-Beryllium source. It is modeled as a point source, located at `(0, 0, 62)` of the MCNP model (center of the B8). It has a distribution of emitted neutron energies `d1` defined by the energy bins in MeV in `si1` and the probability of each bin in `sp1`, e.g., no neutrons < 0.316 MeV, 0.347% between 0.316 MeV to 0.398 MeV, etc. This data is from the [IAEA <i>Compendium of Neutron Spectra</i> (1990), p.79](inis.iaea.org/collection/NCLCollectionStore/_Public/21/092/21092101.pdf). 
+### Heisenberg's Vermehrungsfaktor:
+
+Heisenberg's indicator of criticality was the *Vermehrungsfaktor* $Z$:
+
+```math
+Z = \frac{N_a}{N_0} = \frac{ \text{neutron population outside the core with U-D}_2\text{O added} }{ \text{neutron population outside the core without U-D}_2\text{O} }
+```
+
+Here the "core" boundary is the cylindrical edge of the U-D2O boundary, i.e., the inner surface of the Mg shell. Heisenberg measured the neutron population using Dy2O3 dissolved in HNO3 as his neutron indicators. About 7 probes were spaced outwards in a line along the radius. Heisenberg assumed that the neutron population would be distributed in a radial Gaussian distribution centered at the center of the core. So, to find the total population integrated over the height, all probes were of equal height, extending to the midplane of the core. To integrate over the radius, the Dy2O3-HNO3 volume the $i$-th probe, i.e., the $i$-th probe radius, varied according to weights $w_i$ determined by Gaussian-Legendre:
+
+```math
+\int_0^R \phi(r)~\mathrm{d}r = \sum_{i=1}^7 w_i \phi(r_i)
+```
+
+The major problem here is that I really don't know how Heisenberg accounted for the fact that this "Gaussian" distribution of neutron populations actually interfaces across *four* boundaries: D2O-Mg, Mg-graphite, graphite-Al, and Al-light water. This is problematic because Mg and Al are actually relatively potent neutron absorbers and therefore you can expect some discontinuity in neutron flux at the interface, so Fick's Law kind of goes out the window. Because I don't know how Heisenberg exactly accounted for this, I can't reproduce Heisenberg's experimental measurements precisely, i.e., by simulating the Dy2O3 probes at the exact same dimensions and locations.
+
+**The trick here** is to then calculate the outgoing thermal neutron current (`F1` tally) across the U-D2O boundary. This utilizes the fact that neutrons aren't born by any thermal neutron reaction in these structural materials, so the neutron population "outside of the core" is essentially the outgoing neutron current from the core. We measure the thermal neutron population because Heisenberg's Dy2O3, specifically the Dy-164 nuclide, is a thermal neutron absorber. The following now describes how the MCNP decks.
+
+### MCNP Input File: 
+
+The MCNP input decks in this folder are: [`b8-caseR-d2o96_8-RaBe.inp`](</B8 Fiducial - Flux/b8-caseR-d2o96_8-RaBe.inp>) and [`b8-caseR-d2o96_8-RaBe-EMPTY.inp`](</B8 Fiducial - Flux/b8-caseR-d2o96_8-RaBe-EMPTY.inp>). Both decks are essentially identical, except one core has the real U-D2O arrangement and the other is empty (filled with air). Note that [`b8-caseR-d2o96_8-RaBe.inp`](</B8 Fiducial - Flux/b8-caseR-d2o96_8-RaBe.inp>) is the reference, fiducial B8, i.e., the B8 modeled as completely and exactly as it was built in 1945.
+
+The following `SDEF` card defines a Radon-Beryllium source that lay at the center of the B8. It is modeled as a point source, located at `(0, 0, 62)` of the MCNP model (center of the B8). It has a distribution of emitted neutron energies `d1` defined by the energy bins in MeV in `si1` and the probability of each bin in `sp1`, e.g., no neutrons < 0.316 MeV, 0.347% between 0.316 MeV to 0.398 MeV, etc. This data is from the [IAEA <i>Compendium of Neutron Spectra</i> (1990), p.79](inis.iaea.org/collection/NCLCollectionStore/_Public/21/092/21092101.pdf). 
 ```
 sdef  pos= 0 0 62  erg=d1  par=n
 si1  0.316   0.398   0.501   0.631   0.794   1.00    1.26
@@ -101,54 +55,97 @@ sp1     0    3.47e-3 2.66e-3 1.65e-3 2.03e-3 1.06e-2 2.75e-2
      1.41e-1 5.71e-2 1.39e-3 
 ```
 
-Having defined our RaBe source, this `F4` tally card meaures the volume flux per source neutron in the heavy water (material `1100`) + all the fuel cubes (mats `2001`-`6024`).
+Having defined our RaBe source, this `F1` tally card measures the neutron current through the U-D2O boundary (defined by surfaces 10, 11, 42). The `c1` card bins the results from $\cos\theta \in (-1, 0]$ and $\cos\theta \in [0,1)$ to differentiate the incoming and outgoing currents, respectively.
+
 ```
-fc14 n flux in hwtr + fuel
-f14:n (1100 2001 2002 2003 2004
-            ...
-            6023 6024)
+ fc1    neutrons crossing inner tank
+  f1:n  (10 11 42)
+  c1    0 1
 ```
 
-This `NPS` card states we will run the calculation with `1e6` source neutrons emitted from our RaBe source. The `F4` tally normalizes results to be per 1 source neutron anyways, so bigger the `NPS` the better fidelity. Then, you can manually scale your flux to the real number of neutrons being emitted by the RaBe source per second, if you know its activity (which we do not for the B8).
+This `NPS` card states we will run the calculation with `1e8` source neutrons emitted from our RaBe source. The `F1` tally normalizes results to be per 1 source neutron anyways, so bigger the `NPS` the better fidelity. Then, you can manually scale your result to the real number of neutrons being emitted by the RaBe source per second, if you know its activity (which we do not for the B8).
 ```
-nps 1e6
+nps 1e8
 ```
 
-This `KCODE` card calculates $k_\text{eff}$ with 200,000 source neutrons (this time the source of neutrons being the coordinates of the centers of each fuel cube in `KSRC`), 115 active cycles, and 15 discarded cycles (giving time for the neutron population to converge). I commented it out (`c`) because I had calculated $k_\text{eff}$ in Case R of the other B8 Fiducial folder, but you can also uncomment this and run it yourself.
-```
-c kcode 200000 1 15 115
-```
+Now we run the MCNP decks and wait for the outputs to be generated.
+
+
 
 ### MCNP Output File: 
-[`o_b8_caseR_rings5_d2o96-8_RaBe.o`](</B8 Fiducial - Flux/o_b8_caseR_rings5_d2o96-8_RaBe.o>)
 
-The `F4` tally results can be found by searching for "`1tally       14`":
+The `F1` tally results can be found by searching for "`1tally        2`". The output for the filled case (i.e., the B8 as it was completely and accurately assembled in 1945) is in: [`o-b8-caseR-d2o96_8-RaBe.o`](</B8 Fiducial - Flux/o-b8-caseR-d2o96_8-RaBe.o>)
 ```
-1tally       14        nps =     1000000
-+                                   n flux in hwtr + fuel                                                      
-           tally type 4    track length estimate of particle flux.      units   1/cm**2        
+1tally        1        nps =   100000000
++                                   neutrons crossing inner tank                                               
+           tally type 1    number of particles crossing a surface.                             
            particle(s): neutrons 
-           cell  a is (1100 2001 2002 [...] 6024)                                                                                                             
-
-           volumes 
-                   cell:        a                                                                                  
-                         1.48300E+06
  
- cell (1100 2001 2002 [...] 6023 6024)                                                                   
+ surface (10 11 42)                                                                                                                    
+ angle  bin:  -1.          to  0.00000E+00 mu                                                                                          
       energy   
-    1.0000E-09   7.96402E-07 0.0029
-    1.0267E-09   4.22215E-08 0.0049
-    1.0541E-09   4.44174E-08 0.0049
-    1.0822E-09   4.71006E-08 0.0048
-    [...]
-    1.9480E+01   9.35945E-11 0.2124
-    2.0000E+01   8.17292E-11 0.2549
-      total      2.26368E-03 0.0027
+    1.0000E-06   1.93664E+01 0.0003
+    2.0000E+01   5.24145E+00 0.0003
+      total      2.46079E+01 0.0003
+ 
+ surface (10 11 42)                                                                                                                    
+ angle  bin:   0.00000E+00 to  1.00000E+00 mu                                                                                          
+      energy   
+    1.0000E-06   2.01242E+01 0.0003
+    2.0000E+01   6.89887E+00 0.0003
+      total      2.70230E+01 0.0003
 ```
 
-We have energy bins, the neutron flux tallied within each energy range, and the error. We just copy this into a `.csv` and plot it in Excel (or Python matplotlib).
+The output for the EMPTY case is: [`o-b8-caseR-d2o96_8-RaBe-EMPTY.o`](</B8 Fiducial - Flux/o-b8-caseR-d2o96_8-RaBe-EMPTY.o>)
+
+```
+1tally        1        nps =   100000000
++                                   neutrons crossing inner tank                                               
+           tally type 1    number of particles crossing a surface.                             
+           particle(s): neutrons 
+ 
+ surface (10 11 42)                                                                                                                    
+ angle  bin:  -1.          to  0.00000E+00 mu                                                                                          
+      energy   
+    1.0000E-06   3.28677E+00 0.0002
+    2.0000E+01   2.39169E+00 0.0001
+      total      5.67846E+00 0.0001
+ 
+ surface (10 11 42)                                                                                                                    
+ angle  bin:   0.00000E+00 to  1.00000E+00 mu                                                                                          
+      energy   
+    1.0000E-06   3.29250E+00 0.0002
+    2.0000E+01   3.12656E+00 0.0001
+      total      6.41906E+00 0.0001
+```
+
+We want the outgoing thermal neutron current, so reading the first energy bin of the second cosine bin of each MCNP deck, we get the following
+
+```math
+Z = \frac{N_a}{N_0} = \frac{ 20.1242 }{ 3.29250 } = 6.1121
+```
+
+In each result, the second value tells you the percent error, e.g., in `3.29250E+00 0.0002` there is a 0.02% error. We then calculate the error in quadrature for the quotient $\frac{a}{b} = c$:
+
+```math
+\frac{\Delta c}{c}=\frac{\Delta a}{a} + \frac{\Delta b}{b}\quad \Longrightarrow \quad \Delta c = 6.1121 (0.0003 + 0.0002)= 0.003
+```
+
+Thus our $Z$ is:
+
+```math
+Z = 6.1121 \pm 0.003
+```
+
+which closely matches $Z = 6.7$ that Heisenberg measured during the B8 experiment.
+
+To improve the accuracy of our $Z$, we tally the outgoing neutron current at fine energy bins and weight each bin by the Dy-164 $(n,\gamma)$ cross section at that energy. I do that in Excel, and then we get $Z = 6.456 \pm 0.003$!
+
+
 
 ## B8 Fiducial - k_eff - Sensitivty Analyses
+
+This folder contains ALL the code I used to generate this sensitivity analysis for perturbations in heavy water purity and uranium density:  ![Sensitivity Plot](https://github.com/patrickpark910/b8pile/blob/v3/B8%20Fiducial%20-%20k_eff%20-%20Sensitivity%20Analyses/Figures/sensitivity.pdf)
 
 This is where understanding my code gets a little tricky, because I wrote a huge Python wrapper to automate writing + processing MCNP for me. I don't think anyone will really use my code anyways, but I'll write it out just as due diligence.
 
@@ -162,7 +159,7 @@ I'll now try to walk through executing my code and what happens under the hood.
 
 ### Executing the Python Wrapper
 
-Ideally, executing this all is relatively simple (duh, that's the point of scripting everything, except for the 7,621 times it breaks!). In your terminal, `cd` to this directory and use:
+Ideally, executing this all is relatively simple. In your terminal, `cd` to this directory and use:
 ```sh
 python B8Analysis.py -r <run_type> -t <tasks>
 ```
@@ -385,12 +382,14 @@ def process_keff(self): # paraphrased for README.md
     df_keff.to_csv(self.keff_filepath, encoding='utf8')
 ```
 
-Rinse and repeat Steps 1-8 until you ran and processed all the MCNP runs you want!
+Rinse and repeat Steps 1-8 until you ran and processed all the MCNP runs you want! 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
 ## B8 HCP Lattice - Criticality Optimization
+
+This folder contains ALL the code I used to generate this beautiful contour plot:  ![Contour Plot](https://github.com/patrickpark910/b8pile/blob/v3/B8%20HCP%20Lattice%20-%20Criticality%20Optimization/Figure/contour_extra_labels.png)
 
 This folder has the same structure as [./B8 Fiducial - k_eff - Sensitivity Analyses/](<./B8 Fiducial - k_eff - Sensitivity Analyses/>). I separated the two because writing the MCNP input for the HCP B8 required different template and calculations in MCNP_Input.py than the fiducial B8. *All code in this folder is fully standalone from ./B8 Fiducial - k_eff - Sensitivity Analyses/ and vice versa.*
 
@@ -418,74 +417,16 @@ To make my `contourf` plot, you don't need to touch anything, just execute B8Con
 python B8ContourPlot.py
 ```
 
+
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+
 ## B8 Unit Cell - k_inf
 
-I drew the Unit Cell in my paper as a cylinder, but in the MCNP code it's actually a hexagonal prism (of equivalent Voronoi cross sectional area + volume). I just couldn't be bothered to draw a hexagon in SVG-Edit, which is the software I used to draw figures of the different B8 models. Same difference, though (honestly).
-
-
-
-
-
-See the [open issues](https://github.com/github_username/repo_name/issues) for a full list of proposed features (and known issues).
+My unit cell is a hexagonal prism whose dimensions are determined by the Voronoi cross sectional area for 664 cubes in the fiducial B8.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
-
-<!-- LICENSE -->
-## License
-
-lmao what license
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-
-
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-
-<!-- ACKNOWLEDGMENTS -->
-## Acknowledgments
-
-* []()
-* []()
-* []()
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-
-<!-- MARKDOWN LINKS & IMAGES -->
-<!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-[contributors-shield]: https://img.shields.io/github/contributors/github_username/repo_name.svg?style=for-the-badge
-[contributors-url]: https://github.com/github_username/repo_name/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/github_username/repo_name.svg?style=for-the-badge
-[forks-url]: https://github.com/github_username/repo_name/network/members
-[stars-shield]: https://img.shields.io/github/stars/github_username/repo_name.svg?style=for-the-badge
-[stars-url]: https://github.com/github_username/repo_name/stargazers
-[issues-shield]: https://img.shields.io/github/issues/github_username/repo_name.svg?style=for-the-badge
-[issues-url]: https://github.com/github_username/repo_name/issues
-[license-shield]: https://img.shields.io/github/license/github_username/repo_name.svg?style=for-the-badge
-[license-url]: https://github.com/github_username/repo_name/blob/master/LICENSE.txt
-[linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
-[linkedin-url]: https://linkedin.com/in/linkedin_username
-[product-screenshot]: images/screenshot.png
-[Next.js]: https://img.shields.io/badge/next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white
-[Next-url]: https://nextjs.org/
-[React.js]: https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB
-[React-url]: https://reactjs.org/
-[Vue.js]: https://img.shields.io/badge/Vue.js-35495E?style=for-the-badge&logo=vuedotjs&logoColor=4FC08D
-[Vue-url]: https://vuejs.org/
-[Angular.io]: https://img.shields.io/badge/Angular-DD0031?style=for-the-badge&logo=angular&logoColor=white
-[Angular-url]: https://angular.io/
-[Svelte.dev]: https://img.shields.io/badge/Svelte-4A4A55?style=for-the-badge&logo=svelte&logoColor=FF3E00
-[Svelte-url]: https://svelte.dev/
-[Laravel.com]: https://img.shields.io/badge/Laravel-FF2D20?style=for-the-badge&logo=laravel&logoColor=white
-[Laravel-url]: https://laravel.com
-[Bootstrap.com]: https://img.shields.io/badge/Bootstrap-563D7C?style=for-the-badge&logo=bootstrap&logoColor=white
-[Bootstrap-url]: https://getbootstrap.com
-[JQuery.com]: https://img.shields.io/badge/jQuery-0769AD?style=for-the-badge&logo=jquery&logoColor=white
-[JQuery-url]: https://jquery.com 
