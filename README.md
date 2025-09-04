@@ -145,7 +145,7 @@ To improve the accuracy of our $Z$, we tally the outgoing neutron current at fin
 
 ## B8 Fiducial - k_eff - Sensitivty Analyses
 
-This folder contains ALL the code I used to generate this sensitivity analysis for perturbations in heavy water purity and uranium density:  ![Sensitivity Plot](https://github.com/patrickpark910/b8pile/blob/v3/B8%20Fiducial%20-%20k_eff%20-%20Sensitivity%20Analyses/Figures/sensitivity.pdf)
+This folder contains ALL the code I used to generate this sensitivity analysis for perturbations in heavy water purity and uranium density:  ![Sensitivity Plot](https://github.com/patrickpark910/b8pile/blob/v3/B8%20Fiducial%20-%20k_eff%20-%20Sensitivity%20Analyses/Figures/sensitivity.png)
 
 This is where understanding my code gets a little tricky, because I wrote a huge Python wrapper to automate writing + processing MCNP for me. I don't think anyone will really use my code anyways, but I'll write it out just as due diligence.
 
