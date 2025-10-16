@@ -104,7 +104,7 @@ def main():
     # Add label for the Pareto-optimal contour
     # Find a good position along the contour (at x*100% along the curve)
     label_idx = int(len(x_contour) * 0.15)
-    ax.annotate('Pareto-optimal contour\nof k-eff = 1.00 solutions', 
+    ax.annotate(r'Pareto-optimal contour\nof k$_eff$ = 1.00 solutions', 
                 xy=(x_contour[label_idx], y_contour[label_idx]),
                 xytext=(x_contour[label_idx] - 300, y_contour[label_idx] + 200),
                 fontsize=FONTSIZE, color='black',
