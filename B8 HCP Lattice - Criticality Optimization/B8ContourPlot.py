@@ -1,11 +1,21 @@
 import numpy as np
 import pandas as pd
-import matplotlib
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
 from scipy.interpolate import RegularGridInterpolator
+
+# Use Arial as the global font
+mpl.rcParams['font.family'] = 'sans-serif'
+mpl.rcParams['font.sans-serif'] = ['Arial']
+
+# Force mathtext (subscripts, superscripts, equations) to use the same font
+mpl.rcParams['mathtext.fontset'] = 'custom'
+mpl.rcParams['mathtext.rm'] = 'Arial'
+mpl.rcParams['mathtext.it'] = 'Arial'
+mpl.rcParams['mathtext.bf'] = 'Arial'
 
 
 def main():
@@ -41,6 +51,7 @@ def main():
     
     LEVELS = np.linspace(0.90, 1.02, num=13)
     FONTSIZE = 15
+
 
     """ Plot settings """
     plt.rc('font', family='Arial', size=FONTSIZE)
@@ -85,7 +96,7 @@ def main():
 
     ax.text(
         x_line[pos_idx]-30, y_line[pos_idx]+30,
-        r"Optimal V$_M$ $/$ V$_F$ = 18.6",
+        r"Optimal $V_M$ / $V_F$ = 18.6",
         rotation=angle,
         ha='center', va='center',
         fontsize=FONTSIZE, color='black',
@@ -105,7 +116,7 @@ def main():
     # Add label for the Pareto-optimal contour
     # Find a good position along the contour (at x*100% along the curve)
     label_idx = int(len(x_contour) * 0.15)
-    ax.annotate(r'Pareto-optimal contour\nof k$_eff$ = 1.00 solutions', 
+    ax.annotate(r'Pareto-optimal contour' '\n' r'of k$_{eff}$ = 1.00 solutions', 
                 xy=(x_contour[label_idx], y_contour[label_idx]),
                 xytext=(x_contour[label_idx] - 300, y_contour[label_idx] + 200),
                 fontsize=FONTSIZE, color='black',
@@ -116,8 +127,8 @@ def main():
     
     # Add dot and label for minimum x point
     ax.plot(min_x_point[0], min_x_point[1], 'o', color='black', markersize=6, zorder=5)
-    ax.annotate(f'Minimum cubes\n({min_x_point[0]:.0f} cubes, {min_x_point[1]:.0f} L)'
-                f'\n({cubes_to_kg(min_x_point[0]):.0f} kg, {liters_to_kg(min_x_point[1]):.0f} kg)', 
+    ax.annotate(f'Minimum cubes\n({min_x_point[0]:.0f} cubes, {min_x_point[1]:.0f} L)',
+                # f'\n({cubes_to_kg(min_x_point[0]):.0f} kg, {liters_to_kg(min_x_point[1]):.0f} kg)', 
                 xy=min_x_point,
                 xytext=(min_x_point[0] - 275, min_x_point[1] - 300),
                 fontsize=FONTSIZE, color='black',
@@ -128,8 +139,8 @@ def main():
     
     # Add dot and label for minimum y point
     ax.plot(min_y_point[0], min_y_point[1], 'o', color='black', markersize=6, zorder=5)
-    ax.annotate(f'Minimum D$_2$O\n({min_y_point[0]:.0f} cubes, {min_y_point[1]:.0f} L)'
-                f'\n({cubes_to_kg(min_y_point[0]):.0f} kg, {liters_to_kg(min_y_point[1]):.0f} kg)', 
+    ax.annotate(f'Minimum D$_2$O\n({min_y_point[0]:.0f} cubes, {min_y_point[1]:.0f} L)',
+                # f'\n({cubes_to_kg(min_y_point[0]):.0f} kg, {liters_to_kg(min_y_point[1]):.0f} kg)', 
                 xy=min_y_point,
                 xytext=(min_y_point[0] + 25, min_y_point[1] - 250),
                 fontsize=FONTSIZE, color='black',
@@ -141,10 +152,10 @@ def main():
     # Add fiducial B8 point at 664 cubes and 1400 liters
     fiducial_point = (664, 1400)
     ax.plot(fiducial_point[0], fiducial_point[1], 'o', color='black', markersize=6, zorder=5)
-    ax.annotate(f'Fiducial B8\n(664 cubes, 1400 L)'
-                f'\n({cubes_to_kg(664):.0f} kg, {liters_to_kg(1400):.0f} kg)', 
+    ax.annotate('Fiducial B8' '\n' r'$k_{eff} = 0.94252 \pm 0.00011$' '\n' '(664 cubes, 1400 L)',
+                # f'\n({cubes_to_kg(664):.0f} kg, {liters_to_kg(1400):.0f} kg)', 
                 xy=fiducial_point,
-                xytext=(fiducial_point[0] + 225, fiducial_point[1] + 225),
+                xytext=(fiducial_point[0] + 115, fiducial_point[1] + 85),
                 fontsize=FONTSIZE, color='black',
                 arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=-0.3', 
                                color='black', lw=1, shrinkB=8),
@@ -183,8 +194,8 @@ def main():
     if xi is not None and yi is not None:
         ax.plot(xi, yi, 'o', color='black', markersize=6, zorder=6)
         ax.annotate(
-            f'At optimal V$_M$ $/$ V$_F$\n({xi:.0f} cubes, {yi:.0f} L)'
-            f'\n({cubes_to_kg(xi):.0f} kg, {liters_to_kg(yi):.0f} kg)',
+            f'At optimal V$_M$ $/$ V$_F$\n({xi:.0f} cubes, {yi:.0f} L)',
+            # f'\n({cubes_to_kg(xi):.0f} kg, {liters_to_kg(yi):.0f} kg)',
             xy=(xi, yi),
             xytext=(xi + 50, yi - 250),  
             fontsize=FONTSIZE, color='black',
@@ -198,7 +209,7 @@ def main():
 
 
     """ Total German inventory of 1110 cubes and 1709 L moderator """
-    custom_point = (1110, 1709)
+    total_inventory_pt = (1110, 1709)
     
     # Interpolator for Z on (xi, yi) grid
     xi = np.linspace(c.min(), c.max(), 400)
@@ -207,15 +218,15 @@ def main():
     Z_lin = griddata((c, m), k, (X, Y), method='linear')
     Z = gaussian_filter_nan(Z_lin, sigma=6)
     interp_func = RegularGridInterpolator((yi, xi), Z)
-    k_eff_val = float(interp_func((custom_point[1], custom_point[0])))
+    k_eff_val = float(interp_func((total_inventory_pt[1], total_inventory_pt[0])))
 
 
-    ax.plot(custom_point[0], custom_point[1], 'o', color='black', markersize=6, zorder=6)
+    ax.plot(total_inventory_pt[0], total_inventory_pt[1], 'o', color='black', markersize=6, zorder=6)
     ax.annotate(
-        f'Total German inventory\nk-eff = {k_eff_val:.4f}\n({custom_point[0]:.0f} cubes, {custom_point[1]:.0f} L)'
-        f'\n({cubes_to_kg(custom_point[0]):.0f} kg, {liters_to_kg(custom_point[1]):.0f} kg)',
-        xy=custom_point,
-        xytext=(custom_point[0] + 200, custom_point[1] + 200),  # adjust offset as needed
+        r'Total German inventory' '\n' r'$k_{eff}$' f' = {k_eff_val:.5f}' r' $\pm$ 0.00015' '\n' f'({total_inventory_pt[0]:.0f} cubes, {total_inventory_pt[1]:.0f} L)',
+        # f'\n({cubes_to_kg(total_inventory_pt[0]):.0f} kg, {liters_to_kg(total_inventory_pt[1]):.0f} kg)',
+        xy=total_inventory_pt,
+        xytext=(total_inventory_pt[0] + 115, total_inventory_pt[1] + 85),  # adjust offset as needed
         fontsize=FONTSIZE, color='black',
         arrowprops=dict(
             arrowstyle='->',
@@ -227,7 +238,7 @@ def main():
             boxstyle="square,pad=0.3",
             facecolor='white',
             edgecolor='black',
-            alpha=0.8) )
+            alpha=0.5) )
 
 
 
@@ -236,7 +247,7 @@ def main():
     # Primary axes
     ax.set_xlabel(r'Number of uranium cubes', fontsize=FONTSIZE)
     ax.set_ylabel('96.8%-pure heavy water volume [L]', fontsize=FONTSIZE)
-    cbar.set_label('Effective multiplication [k-eff]', fontsize=FONTSIZE)
+    cbar.set_label(r'Effective multiplication [$k_{eff}$]', fontsize=FONTSIZE)
 
     ax.minorticks_on()
     ax.set_xticks(np.arange(500, 2101, step=200))
@@ -269,8 +280,8 @@ def main():
     secax_y.tick_params(axis="y", which="minor", length=3)  # minor ticks
 
     fig.tight_layout()
-    plt.savefig("./Figure/contour_extra_labels.png", dpi=600, bbox_inches="tight", pad_inches=0.01) # _extra_labels
-    plt.savefig("./Figure/contour_extra_labels.pdf", bbox_inches="tight", pad_inches=0.01) # _extra_labels
+    plt.savefig("./Figure/contour.png", dpi=600, bbox_inches="tight", pad_inches=0.01) # _extra_labels
+    plt.savefig("./Figure/contour.pdf", bbox_inches="tight", pad_inches=0.01) # _extra_labels
     plt.show()
 
 
