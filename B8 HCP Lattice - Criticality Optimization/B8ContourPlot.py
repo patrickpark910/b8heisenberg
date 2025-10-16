@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
+from scipy.interpolate import RegularGridInterpolator
 
 
 def main():
@@ -80,7 +81,7 @@ def main():
     angle = np.degrees(np.arctan(slope)) - 28.25
 
     # Place label lower on the line (x*100% up from start)
-    pos_idx = int(len(x_line) * 0.3)
+    pos_idx = int(len(x_line) * 0.325)
 
     ax.text(
         x_line[pos_idx]-30, y_line[pos_idx]+30,
@@ -109,41 +110,44 @@ def main():
                 xytext=(x_contour[label_idx] - 300, y_contour[label_idx] + 200),
                 fontsize=FONTSIZE, color='black',
                 arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0.3', 
-                               color='black', lw=1),
+                               color='black', lw=1, shrinkB=8),
                 bbox=dict(boxstyle="square,pad=0.3", facecolor='white', 
                          edgecolor='black', alpha=0.8))
     
     # Add dot and label for minimum x point
     ax.plot(min_x_point[0], min_x_point[1], 'o', color='black', markersize=6, zorder=5)
-    ax.annotate(f'Minimum cubes\n({min_x_point[0]:.0f} cubes, {min_x_point[1]:.0f} L)\n({cubes_to_kg(min_x_point[0]):.0f} kg, {liters_to_kg(min_x_point[1]):.0f} kg)', 
+    ax.annotate(f'Minimum cubes\n({min_x_point[0]:.0f} cubes, {min_x_point[1]:.0f} L)'
+                f'\n({cubes_to_kg(min_x_point[0]):.0f} kg, {liters_to_kg(min_x_point[1]):.0f} kg)', 
                 xy=min_x_point,
                 xytext=(min_x_point[0] - 275, min_x_point[1] - 300),
                 fontsize=FONTSIZE, color='black',
                 arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=-0.3', 
-                               color='black', lw=1),
+                               color='black', lw=1, shrinkB=8),
                 bbox=dict(boxstyle="square,pad=0.3", facecolor='white', 
                          edgecolor='black', alpha=0.8))
     
     # Add dot and label for minimum y point
     ax.plot(min_y_point[0], min_y_point[1], 'o', color='black', markersize=6, zorder=5)
-    ax.annotate(f'Minimum D$_2$O\n({min_y_point[0]:.0f} cubes, {min_y_point[1]:.0f} L)\n({cubes_to_kg(min_y_point[0]):.0f} kg, {liters_to_kg(min_y_point[1]):.0f} kg)', 
+    ax.annotate(f'Minimum D$_2$O\n({min_y_point[0]:.0f} cubes, {min_y_point[1]:.0f} L)'
+                f'\n({cubes_to_kg(min_y_point[0]):.0f} kg, {liters_to_kg(min_y_point[1]):.0f} kg)', 
                 xy=min_y_point,
                 xytext=(min_y_point[0] + 25, min_y_point[1] - 250),
                 fontsize=FONTSIZE, color='black',
                 arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0.3', 
-                               color='black', lw=1),
+                               color='black', lw=1, shrinkB=8),
                 bbox=dict(boxstyle="square,pad=0.3", facecolor='white', 
                          edgecolor='black', alpha=0.8))
 
     # Add fiducial B8 point at 664 cubes and 1400 liters
     fiducial_point = (664, 1400)
     ax.plot(fiducial_point[0], fiducial_point[1], 'o', color='black', markersize=6, zorder=5)
-    ax.annotate(f'Fiducial B8\n(664 cubes, 1400 L)\n({cubes_to_kg(664):.0f} kg, {liters_to_kg(1400):.0f} kgL)', 
+    ax.annotate(f'Fiducial B8\n(664 cubes, 1400 L)'
+                f'\n({cubes_to_kg(664):.0f} kg, {liters_to_kg(1400):.0f} kg)', 
                 xy=fiducial_point,
                 xytext=(fiducial_point[0] + 225, fiducial_point[1] + 225),
                 fontsize=FONTSIZE, color='black',
                 arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=-0.3', 
-                               color='black', lw=1),
+                               color='black', lw=1, shrinkB=8),
                 bbox=dict(boxstyle="square,pad=0.3", facecolor='white', 
                          edgecolor='black', alpha=0.5))
 
@@ -151,7 +155,7 @@ def main():
     a = 18.6 * CUBE_VOL_L
     b = 0.0
 
-    # Find intersection between the polyline (k=1 contour) and the straight line
+    # Find intersection between the k=1 contour and the straight line
     xi = yi = None
     for i in range(len(x_contour) - 1):
         x1, y1 = x_contour[i],     y_contour[i]
@@ -179,18 +183,55 @@ def main():
     if xi is not None and yi is not None:
         ax.plot(xi, yi, 'o', color='black', markersize=6, zorder=6)
         ax.annotate(
-            f'Intersection (k-eff=1)\n({xi:.0f} cubes, {yi:.0f} L)\n'
-            f'({cubes_to_kg(xi):.0f} kg, {liters_to_kg(yi):.0f} kg)',
+            f'At optimal V$_M$ $/$ V$_F$\n({xi:.0f} cubes, {yi:.0f} L)'
+            f'\n({cubes_to_kg(xi):.0f} kg, {liters_to_kg(yi):.0f} kg)',
             xy=(xi, yi),
-            xytext=(xi + 200, yi + 150),  # tweak 
+            xytext=(xi + 50, yi - 250),  
             fontsize=FONTSIZE, color='black',
             arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0.2',
-                            color='black', lw=1),
+                            color='black', lw=1, shrinkB=8),
             bbox=dict(boxstyle="square,pad=0.3", facecolor='white',
                       edgecolor='black', alpha=0.8)
         )
     else:
         print("Warning: no intersection found between k=1 contour and the 18.6 line.")
+
+
+    """ Total German inventory of 1110 cubes and 1709 L moderator """
+    custom_point = (1110, 1709)
+    
+    # Interpolator for Z on (xi, yi) grid
+    xi = np.linspace(c.min(), c.max(), 400)
+    yi = np.linspace(m.min(), m.max(), 400)
+    X, Y = np.meshgrid(xi, yi)
+    Z_lin = griddata((c, m), k, (X, Y), method='linear')
+    Z = gaussian_filter_nan(Z_lin, sigma=6)
+    interp_func = RegularGridInterpolator((yi, xi), Z)
+    k_eff_val = float(interp_func((custom_point[1], custom_point[0])))
+
+
+    ax.plot(custom_point[0], custom_point[1], 'o', color='black', markersize=6, zorder=6)
+    ax.annotate(
+        f'Total German inventory\nk-eff = {k_eff_val:.4f}\n({custom_point[0]:.0f} cubes, {custom_point[1]:.0f} L)'
+        f'\n({cubes_to_kg(custom_point[0]):.0f} kg, {liters_to_kg(custom_point[1]):.0f} kg)',
+        xy=custom_point,
+        xytext=(custom_point[0] + 200, custom_point[1] + 200),  # adjust offset as needed
+        fontsize=FONTSIZE, color='black',
+        arrowprops=dict(
+            arrowstyle='->',
+            connectionstyle='arc3,rad=0.2',
+            color='black', lw=1,
+            shrinkB=8   
+        ),
+        bbox=dict(
+            boxstyle="square,pad=0.3",
+            facecolor='white',
+            edgecolor='black',
+            alpha=0.8) )
+
+
+
+
 
     # Primary axes
     ax.set_xlabel(r'Number of uranium cubes', fontsize=FONTSIZE)
@@ -228,8 +269,8 @@ def main():
     secax_y.tick_params(axis="y", which="minor", length=3)  # minor ticks
 
     fig.tight_layout()
-    # plt.savefig("./Figure/contour_extra_labels.png", dpi=600, bbox_inches="tight", pad_inches=0.01)
-    # plt.savefig("./Figure/contour_extra_labels.pdf", bbox_inches="tight", pad_inches=0.01)
+    plt.savefig("./Figure/contour_extra_labels.png", dpi=600, bbox_inches="tight", pad_inches=0.01) # _extra_labels
+    plt.savefig("./Figure/contour_extra_labels.pdf", bbox_inches="tight", pad_inches=0.01) # _extra_labels
     plt.show()
 
 
